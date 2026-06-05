@@ -1724,7 +1724,9 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
       state.activeSession =
         sessionSettings.providerId === "desktop-whisper" ||
         sessionSettings.providerId === "openrouter-stt"
-          ? startDesktopWhisperSession(target, sessionSettings, sessionHandlers)
+          ? startDesktopWhisperSession(target, sessionSettings, sessionHandlers, {
+              preserveStartupStop: options.startedFromShortcut === true,
+            })
           : startBrowserSpeechSession(target, sessionSettings, sessionHandlers);
       render();
     } catch (error) {

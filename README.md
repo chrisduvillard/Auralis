@@ -240,11 +240,11 @@ Important caveats:
 
 The desktop **Update now** action checks `chrisduvillard/Auralis` GitHub Releases, downloads and installs the latest published GitHub Release when available, and uses a narrow Electron IPC surface.
 
-Publish the NSIS installer plus GitHub Release metadata files such as `latest.yml` so installed clients can discover updates. For `v*` tag releases with Windows signing secrets configured, the current Windows workflow publishes the signed NSIS installer, `Auralis-Setup-*.exe.blockmap`, and `latest*.yml` metadata so the in-app updater can discover and install releases.
+Publish the NSIS installer plus GitHub Release metadata files such as `latest.yml` so installed clients can discover updates. For successful, non-canceled public `main` push workflow runs and for `v*` tag releases with Windows signing secrets configured, the current Windows workflow publishes the NSIS installer, `Auralis-Setup-*.exe.blockmap`, and `latest*.yml` metadata so the in-app updater can discover and install releases.
 
-Public updater releases are tag-only. Pushing a `v*` tag publishes the NSIS installer, blockmap, and `latest.yml` metadata to the tagged GitHub Release with `make_latest: true` only when Windows signing certificate secrets are configured. Main-branch pushes still build and smoke-test installer artifacts, but they do not publish updater-visible releases. Enforce protected or signed release tags with GitHub repository rulesets before relying on this as a public update channel.
+On the public `chrisduvillard/Auralis` repository, each successful, non-canceled `main` push workflow run creates an updater-visible GitHub Release with a monotonic generated version based on the workflow run number and marks it latest. Intentional `v*` tag releases still require Windows signing certificate secrets. Enforce protected or signed release tags with GitHub repository rulesets before relying on tagged releases as a public update channel.
 
-Private GitHub repositories are not a public update channel. If Auralis must update every external user without GitHub authentication, the release assets and `latest.yml` feed need to be public, either by making the release repository public or by publishing the same assets to a public update host. Do not ship a GitHub token inside the app.
+Private GitHub repositories are not a public update channel. If Auralis must update every external user without GitHub authentication, the release assets and `latest.yml` feed need to be public, either by publishing from the public `chrisduvillard/Auralis` repository or by publishing the same assets to another public update host. Do not ship a GitHub token inside the app.
 
 ## Install and package
 
@@ -280,7 +280,7 @@ The Windows installer is written to:
 release/Auralis-Setup-*.exe
 ```
 
-The GitHub Actions workflow at `.github/workflows/windows-installer.yml` builds and uploads an `Auralis-Windows-Installer` artifact on pushes to `main`, `v*` tags, and manual dispatch. Only `v*` tags can publish assets to GitHub Releases, and publication requires Windows signing certificate secrets. Main pushes are validation builds, not the public update channel.
+The GitHub Actions workflow at `.github/workflows/windows-installer.yml` builds and uploads an `Auralis-Windows-Installer` artifact on pushes to `main`, `v*` tags, and manual dispatch. Public `main` pushes in `chrisduvillard/Auralis` publish updater-visible release assets after the Windows installer smoke passes; `v*` tag publication still requires Windows signing certificate secrets.
 
 ## Validation
 
@@ -441,7 +441,7 @@ auralis/
 - The local Whisper runtime and selected model can take time to download and warm on first use.
 - Browser Web Speech availability and privacy behavior depend on the browser engine.
 - Linux Wayland usually blocks automatic paste, so clipboard copy is the safe fallback.
-- Local Windows installer builds are unsigned unless signing is explicitly enabled. Public updater releases require signing secrets.
+- Local Windows installer builds and public main-push updater builds are unsigned unless signing is explicitly enabled. Signed `v*` tag releases require signing secrets.
 - Linux and macOS packaged installers are not yet configured.
 - OpenRouter STT is optional and currently configured through `OPENROUTER_API_KEY`, not through an in-app key field.
 

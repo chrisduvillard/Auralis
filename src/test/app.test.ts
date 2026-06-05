@@ -172,6 +172,17 @@ class FakeMediaRecorder {
   }
 }
 
+class ManualStartMediaRecorder extends FakeMediaRecorder {
+  start(timeslice?: number): void {
+    this.startTimeslice = timeslice;
+    this.state = "recording";
+  }
+
+  emitStart(): void {
+    this.onstart?.(new Event("start"));
+  }
+}
+
 function installFakeMediaRecorder(): { stoppedTracks: string[] } {
   const stoppedTracks: string[] = [];
   Object.defineProperty(window, "MediaRecorder", {
@@ -1499,6 +1510,174 @@ describe("Auralis app UI", () => {
       providerId: "desktop-whisper",
       text: "local whisper transcript",
     });
+  });
+
+  it("keeps shortcut recordings alive when stop arrives while the microphone is still preparing", async () => {
+    vi.useFakeTimers();
+    const streamRequest = deferred<MediaStream>();
+    const stoppedTracks: string[] = [];
+    const transcribeRequests: Array<{ audioData: ArrayBuffer }> = [];
+    const captureStates: Array<{ muteSystemAudio: boolean; status: string }> = [];
+
+    Object.defineProperty(window, "MediaRecorder", {
+      configurable: true,
+      value: ManualStartMediaRecorder,
+    });
+    Object.defineProperty(window.navigator, "mediaDevices", {
+      configurable: true,
+      value: {
+        getUserMedia: () => streamRequest.promise,
+      },
+    });
+    Object.defineProperty(window, "auralisDesktop", {
+      configurable: true,
+      value: {
+        pasteText: async () => ({
+          message: "Transcript pasted into the previous app.",
+          ok: true,
+          pasted: true,
+        }),
+        platform: "linux",
+        setCaptureState: (payload: { muteSystemAudio: boolean; status: string }) => {
+          captureStates.push(payload);
+        },
+        shortcutLabel: "Ctrl + Alt + Space toggles from any app",
+        transcribeAudio: async (request: { audioData: ArrayBuffer }) => {
+          transcribeRequests.push(request);
+          return {
+            message: "Transcribed locally with Whisper.",
+            ok: true,
+            text: "first word preserved",
+          };
+        },
+      },
+    });
+    enableTranscriptHistory({
+      modelId: "desktop-whisper-base",
+      providerId: "desktop-whisper",
+      saveTranscriptHistory: false,
+    });
+
+    const { root } = mountApp();
+
+    window.dispatchEvent(
+      new CustomEvent("auralis:desktop-toggle-dictation", {
+        detail: {
+          action: "start",
+          autoPaste: true,
+          holdToTalk: true,
+          pasteTargetToken: "fresh-target-token",
+          startedFromShortcut: true,
+        },
+      }),
+    );
+    await vi.waitFor(() => expect(captureStates.at(-1)?.status).toBe("starting"));
+    expect(root.textContent).toContain("Preparing microphone");
+
+    window.dispatchEvent(
+      new CustomEvent("auralis:desktop-toggle-dictation", {
+        detail: { action: "stop", holdToTalk: true, startedFromShortcut: true },
+      }),
+    );
+    await Promise.resolve();
+    expect(captureStates.at(-1)?.status).toBe("starting");
+
+    streamRequest.resolve({
+      getTracks: () => [
+        {
+          stop: () => {
+            stoppedTracks.push("audio");
+          },
+        },
+      ],
+    } as unknown as MediaStream);
+    await vi.waitFor(() =>
+      expect(FakeMediaRecorder.latest).toBeInstanceOf(ManualStartMediaRecorder),
+    );
+
+    (FakeMediaRecorder.latest as ManualStartMediaRecorder).emitStart();
+    await vi.waitFor(() => expect(captureStates.at(-1)?.status).toBe("recording"));
+
+    window.dispatchEvent(
+      new CustomEvent("auralis:desktop-toggle-dictation", {
+        detail: { action: "stop", holdToTalk: true, startedFromShortcut: true },
+      }),
+    );
+    await vi.advanceTimersByTimeAsync(300);
+    expect(transcribeRequests).toHaveLength(0);
+
+    await vi.advanceTimersByTimeAsync(400);
+
+    await vi.waitFor(() => expect(transcribeRequests).toHaveLength(1));
+    expect(transcribeRequests[0]?.audioData.byteLength).toBeGreaterThan(0);
+    expect(stoppedTracks).toContain("audio");
+    expect(root.querySelector<HTMLTextAreaElement>("#transcript-area")?.value).toBe(
+      "first word preserved",
+    );
+  });
+
+  it("does not stop shortcut recording in the MediaRecorder started-before-onstart gap", async () => {
+    vi.useFakeTimers();
+    installFakeMediaRecorder();
+    Object.defineProperty(window, "MediaRecorder", {
+      configurable: true,
+      value: ManualStartMediaRecorder,
+    });
+    const transcribeRequests: Array<{ audioData: ArrayBuffer }> = [];
+    Object.defineProperty(window, "auralisDesktop", {
+      configurable: true,
+      value: {
+        platform: "linux",
+        shortcutLabel: "Ctrl + Alt + Space toggles from any app",
+        transcribeAudio: async (request: { audioData: ArrayBuffer }) => {
+          transcribeRequests.push(request);
+          return {
+            message: "Transcribed locally with Whisper.",
+            ok: true,
+            text: "recorder startup gap preserved",
+          };
+        },
+      },
+    });
+    enableTranscriptHistory({
+      modelId: "desktop-whisper-base",
+      providerId: "desktop-whisper",
+      saveTranscriptHistory: false,
+    });
+
+    const { root } = mountApp();
+
+    window.dispatchEvent(
+      new CustomEvent("auralis:desktop-toggle-dictation", {
+        detail: {
+          action: "start",
+          holdToTalk: true,
+          startedFromShortcut: true,
+        },
+      }),
+    );
+    await vi.waitFor(() =>
+      expect(FakeMediaRecorder.latest).toBeInstanceOf(ManualStartMediaRecorder),
+    );
+
+    const recorder = FakeMediaRecorder.latest as ManualStartMediaRecorder;
+    expect(recorder.state).toBe("recording");
+    window.dispatchEvent(
+      new CustomEvent("auralis:desktop-toggle-dictation", {
+        detail: { action: "stop", holdToTalk: true, startedFromShortcut: true },
+      }),
+    );
+    await Promise.resolve();
+    expect(recorder.requestDataCalls).toBe(0);
+    expect(transcribeRequests).toHaveLength(0);
+
+    recorder.emitStart();
+    await vi.advanceTimersByTimeAsync(700);
+
+    await vi.waitFor(() => expect(transcribeRequests).toHaveLength(1));
+    expect(root.querySelector<HTMLTextAreaElement>("#transcript-area")?.value).toBe(
+      "recorder startup gap preserved",
+    );
   });
 
   it("binds shortcut-started desktop paste delivery to the fresh target token", async () => {

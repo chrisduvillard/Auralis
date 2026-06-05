@@ -36,7 +36,7 @@ describe("desktop app packaging config", () => {
       devDependencies?: Record<string, string>;
     };
 
-    expect(packageJson.version).toBe("0.1.1");
+    expect(packageJson.version).toBe("0.1.2");
     expect(packageJson.main).toBe("electron/main.cjs");
     expect(packageJson.engines?.node).toBe(">=22.12.0");
     expect(packageJson.engines?.npm).toBe(">=10");
@@ -102,13 +102,13 @@ describe("desktop app packaging config", () => {
       {
         cwd: projectRoot,
         encoding: "utf-8",
-        env: { ...process.env, OPENROUTER_API_KEY: "sk-test-secret-value" },
+        env: { ...process.env, OPENROUTER_API_KEY: "test-key" },
       },
     );
 
     expect(result.status).toBe(0);
-    expect(result.stderr).not.toContain("sk-test-secret-value");
-    expect(result.stdout).not.toContain("sk-test-secret-value");
+    expect(result.stderr).not.toContain("test-key");
+    expect(result.stdout).not.toContain("test-key");
 
     const payload = JSON.parse(result.stdout) as {
       checks: Array<{
@@ -176,25 +176,23 @@ describe("desktop app packaging config", () => {
     expect(assetScript).toContain("latest*.yml");
   });
 
-  it("keeps public updater publication behind signed v-tag releases", () => {
+  it("publishes updater-visible public main releases with monotonic versions", () => {
     const workflow = readProjectFile(".github/workflows/windows-installer.yml");
 
-    expect(workflow).not.toContain("Prepare auto-update version for main pushes");
-    expect(workflow).not.toContain("npm version $autoUpdateVersion --no-git-tag-version");
-    expect(workflow).not.toContain(
-      "github.event_name == 'push' && github.ref == 'refs/heads/main'",
-    );
+    expect(workflow).toContain("Resolve updater release version");
+    expect(workflow).toContain("npm version $releaseVersion --no-git-tag-version");
+    expect(workflow).toContain("github.event_name == 'push' && github.ref == 'refs/heads/main'");
     expect(workflow).toContain("release-windows-installer:");
     expect(workflow).toContain("startsWith(github.ref, 'refs/tags/v')");
-    expect(workflow).not.toContain("refs/heads/main");
-    expect(workflow).not.toContain(
-      ["tag_name: auralis-main-", "{{ github.run_number }}"].join("$"),
+    expect(workflow).toContain("github.repository == 'chrisduvillard/Auralis'");
+    expect(workflow).toContain(
+      ["tag_name: ", "{{ needs.build-windows-installer.outputs.release-tag }}"].join("$"),
     );
     expect(workflow).toContain(["target_commitish: ", "{{ github.sha }}"].join("$"));
     expect(workflow).toContain("make_latest: true");
     expect(workflow).not.toContain("make_latest: false");
-    expect(workflow).not.toContain(
-      "This release is created for successful, non-canceled pushes to `main`",
+    expect(workflow).toContain(
+      "This release is created for a successful, non-canceled public main push",
     );
     expect(workflow).not.toContain("This release is created on every push to `main`");
     expect(workflow).toContain("group: windows-installer-update-channel");
@@ -524,7 +522,7 @@ describe("desktop app packaging config", () => {
     expect(mainProcess).toContain("autoUpdater.setFeedURL");
     expect(mainProcess).toContain('provider: "github"');
     expect(mainProcess).toContain('owner: "chrisduvillard"');
-    expect(mainProcess).toContain('repo: "auralis"');
+    expect(mainProcess).toContain('repo: "Auralis"');
     expect(mainProcess).toContain("autoUpdater.checkForUpdates()");
     expect(mainProcess).toContain("autoUpdater.quitAndInstall(false, true)");
     expect(mainProcess).toContain("appVersion: app.getVersion()");
@@ -653,6 +651,26 @@ describe("desktop app packaging config", () => {
     expect(mainProcess).toContain(
       '["listening", "recording", "starting"].includes(payload.status)',
     );
+  });
+
+  it("uses a passive non-focusable whisper overlay instead of routine shortcut popups", () => {
+    const mainProcess = readProjectFile("electron/main.cjs");
+    const preload = readProjectFile("electron/preload.cjs");
+
+    expect(mainProcess).toContain("let listeningOverlayWindow = null");
+    expect(mainProcess).toContain("function createListeningOverlayWindow()");
+    expect(mainProcess).toContain("focusable: false");
+    expect(mainProcess).toContain("skipTaskbar: true");
+    expect(mainProcess).toContain("transparent: true");
+    expect(mainProcess).toContain("frame: false");
+    expect(mainProcess).toContain("setIgnoreMouseEvents(true");
+    expect(mainProcess).toContain("showInactive()");
+    expect(mainProcess).toContain("updateListeningOverlayFromCapture(payload)");
+    expect(mainProcess).toContain("flashListeningOverlay(message)");
+    expect(mainProcess).toContain("destroyListeningOverlay()");
+    expect(mainProcess).toContain("if (!mainWindow || mainWindow.isDestroyed())");
+    expect(mainProcess).not.toContain("focusListeningOverlay");
+    expect(preload).not.toContain("listening-overlay");
   });
 
   it("keeps audio ducking fail-safe across unknown state, races, and app quit", () => {
@@ -1133,7 +1151,7 @@ with tempfile.TemporaryDirectory() as temp_dir:
     );
   });
 
-  it("publishes a signed Windows installer artifact from tagged GitHub Actions releases only", () => {
+  it("publishes Windows updater releases only from public main or intentional tags", () => {
     const workflow = readProjectFile(".github/workflows/windows-installer.yml");
 
     expect(workflow).toContain('FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"');
@@ -1154,7 +1172,7 @@ with tempfile.TemporaryDirectory() as temp_dir:
     expect(workflow).not.toContain("actions/download-artifact@v4");
     expect(workflow).toContain("softprops/action-gh-release@v2");
     expect(workflow).toContain("startsWith(github.ref, 'refs/tags/v')");
-    expect(workflow).toContain("Validate release tag matches package version");
+    expect(workflow).toContain("Resolve updater release version");
     expect(workflow).toContain('$env:GITHUB_REF_NAME -ne "v$packageVersion"');
     expect(workflow).toContain(
       "Signing certificate is required for public Windows release publication.",
@@ -1162,7 +1180,8 @@ with tempfile.TemporaryDirectory() as temp_dir:
     expect(workflow).not.toContain(
       "No Windows signing certificate configured; building unsigned installer.",
     );
-    expect(workflow).not.toContain("github.ref == 'refs/heads/main'");
+    expect(workflow).toContain("github.repository == 'chrisduvillard/Auralis'");
+    expect(workflow).toContain("github.ref == 'refs/heads/main'");
     expect(workflow).not.toContain(["auralis-main-", "{{ github.run_number }}"].join("$"));
     expect(workflow).toContain("Auralis-Windows-Installer");
     expect(workflow).toContain("release/Auralis-Setup-*.exe");
@@ -1223,22 +1242,21 @@ with tempfile.TemporaryDirectory() as temp_dir:
     expect(readme).toContain('rmdir /s /q "%LOCALAPPDATA%\\electron-builder\\Cache\\winCodeSign"');
   });
 
-  it("documents tag-only desktop updates with signed Windows installer assets", () => {
+  it("documents updater-visible public main releases with signed tag releases", () => {
     const readme = readProjectFile("README.md");
 
     expect(readme).toContain("Update now");
     expect(readme).toContain("downloads and installs the latest published GitHub Release");
     expect(readme).toContain("GitHub Release metadata files such as `latest.yml`");
-    expect(readme).toContain("Public updater releases are tag-only");
-    expect(readme).toContain("Windows signing certificate secrets are configured");
+    expect(readme).toContain(
+      "successful, non-canceled `main` push workflow run creates an updater-visible GitHub Release",
+    );
+    expect(readme).toContain("tag releases still require Windows signing certificate secrets");
     expect(readme).toContain(
       "Enforce protected or signed release tags with GitHub repository rulesets",
     );
     expect(readme).not.toContain("Pushing a signed `v*` tag publishes");
     expect(readme).not.toContain("Only signed `v*` tags publish assets");
-    expect(readme).not.toContain(
-      "successful, non-canceled `main` push workflow run creates an updater-visible GitHub Release",
-    );
     expect(readme).not.toContain("Every push to `main` creates an updater-visible GitHub Release");
     expect(readme).toContain("Private GitHub repositories are not a public update channel");
   });
@@ -1250,7 +1268,7 @@ with tempfile.TemporaryDirectory() as temp_dir:
       "On Linux, `npm run desktop` may first require Electron sandbox setup.",
     );
     expect(readme).toContain(
-      "For `v*` tag releases with Windows signing secrets configured, the current Windows workflow publishes the signed NSIS installer, `Auralis-Setup-*.exe.blockmap`, and `latest*.yml` metadata so the in-app updater can discover and install releases.",
+      "For successful, non-canceled public `main` push workflow runs and for `v*` tag releases with Windows signing secrets configured, the current Windows workflow publishes the NSIS installer, `Auralis-Setup-*.exe.blockmap`, and `latest*.yml` metadata so the in-app updater can discover and install releases.",
     );
     expect(readme).toContain(
       "The Windows workflow verifies silent install and installed-app launch, then attempts the uninstaller when it is present.",

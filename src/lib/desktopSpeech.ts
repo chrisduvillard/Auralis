@@ -9,6 +9,7 @@ import type {
 
 const MAX_AUDIO_BYTES = 30 * 1024 * 1024;
 const MEDIARECORDER_TIMESLICE_MS = 250;
+const STARTUP_STOP_GRACE_RECORDING_MS = 650;
 
 interface DesktopTranscribeRequest {
   audioData: ArrayBuffer;
@@ -29,6 +30,10 @@ interface DesktopTranscribeResult {
   ok: boolean;
   providerId?: ProviderId;
   text?: string;
+}
+
+interface DesktopWhisperSessionOptions {
+  preserveStartupStop?: boolean;
 }
 
 interface DesktopBridge {
@@ -167,6 +172,7 @@ export function startDesktopWhisperSession(
   target: BrowserWindow,
   settings: TranscriptSettings,
   handlers: SpeechSessionHandlers,
+  options: DesktopWhisperSessionOptions = {},
 ): SpeechSession {
   const transcribeAudio = target.auralisDesktop?.transcribeAudio;
 
@@ -189,8 +195,10 @@ export function startDesktopWhisperSession(
 
   let ended = false;
   let recorder: MediaRecorder | null = null;
+  let recorderStartedAt = 0;
   let recorderStopping = false;
   let startCancelled = false;
+  let startupStopTimer: number | null = null;
   let stream: MediaStream | null = null;
   let transcribing = false;
   let stopMeter: (() => void) | null = null;
@@ -203,6 +211,10 @@ export function startDesktopWhisperSession(
     }
 
     ended = true;
+    if (startupStopTimer !== null) {
+      target.clearTimeout(startupStopTimer);
+      startupStopTimer = null;
+    }
     stopMeter?.();
     stopMeter = null;
     stopStream(stream);
@@ -217,6 +229,37 @@ export function startDesktopWhisperSession(
 
     handlers.onError(message);
     finishOnce();
+  }
+
+  function stopRecorderNow(activeRecorder: MediaRecorder): void {
+    if (recorderStopping || transcribing || activeRecorder.state === "inactive") {
+      return;
+    }
+
+    recorderStopping = true;
+    try {
+      activeRecorder.requestData();
+    } catch {}
+    activeRecorder.stop();
+  }
+
+  function stopRecorderAfterStartupGrace(activeRecorder: MediaRecorder): void {
+    const elapsedMs = recorderStartedAt > 0 ? Date.now() - recorderStartedAt : 0;
+    const remainingMs = Math.max(0, STARTUP_STOP_GRACE_RECORDING_MS - elapsedMs);
+
+    if (remainingMs === 0) {
+      stopRecorderNow(activeRecorder);
+      return;
+    }
+
+    if (startupStopTimer !== null) {
+      return;
+    }
+
+    startupStopTimer = target.setTimeout(() => {
+      startupStopTimer = null;
+      stopRecorderNow(activeRecorder);
+    }, remainingMs);
   }
 
   async function transcribeRecordedAudio(): Promise<void> {
@@ -322,12 +365,13 @@ export function startDesktopWhisperSession(
           return;
         }
 
+        recorderStartedAt = Date.now();
         handlers.onStart();
         handlers.onNotice("Recording locally. Speak now, then click Stop & transcribe.");
 
         const activeRecorder = recorder;
         if (startCancelled && activeRecorder && activeRecorder.state !== "inactive") {
-          activeRecorder.stop();
+          stopRecorderAfterStartupGrace(activeRecorder);
         }
       };
 
@@ -361,11 +405,23 @@ export function startDesktopWhisperSession(
       }
 
       if (recorder && recorder.state !== "inactive") {
-        recorderStopping = true;
-        try {
-          recorder.requestData();
-        } catch {}
-        recorder.stop();
+        if (options.preserveStartupStop && (recorderStartedAt === 0 || startupStopTimer !== null)) {
+          return;
+        }
+
+        if (
+          options.preserveStartupStop &&
+          Date.now() - recorderStartedAt < STARTUP_STOP_GRACE_RECORDING_MS
+        ) {
+          stopRecorderAfterStartupGrace(recorder);
+          return;
+        }
+
+        stopRecorderNow(recorder);
+        return;
+      }
+
+      if (options.preserveStartupStop) {
         return;
       }
 

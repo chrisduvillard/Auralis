@@ -6,6 +6,7 @@ const {
   ipcMain,
   Menu,
   Notification,
+  screen,
   session,
   shell,
 } = require("electron");
@@ -72,6 +73,11 @@ const OPENROUTER_MODELS = new Set(OPENROUTER_TRANSCRIPTION_MODELS.keys());
 const SUPPORTED_LANGUAGES = new Set(["en-US", "en-GB", "de-DE", "fr-FR", "es-ES"]);
 
 let mainWindow = null;
+let listeningOverlayWindow = null;
+let listeningOverlayReady = false;
+let listeningOverlayFlashTimer = null;
+let listeningOverlayLastCapture = { muteSystemAudio: false, status: "idle" };
+let listeningOverlayPendingPayload = null;
 let lastExternalFocusTarget = null;
 let cachedWhisperPython = null;
 let rendererCaptureState = "idle";
@@ -103,11 +109,219 @@ autoUpdater.allowDowngrade = false;
 autoUpdater.setFeedURL({
   owner: "chrisduvillard",
   provider: "github",
-  repo: "auralis",
+  repo: "Auralis",
 });
 
 function rendererUrl() {
   return pathToFileURL(path.join(__dirname, "..", "dist", "index.html")).toString();
+}
+
+const LISTENING_OVERLAY_HTML = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline';" />
+<style>
+  :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+  html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; user-select: none; }
+  .bar { position: absolute; left: 16px; right: 16px; bottom: 12px; height: 28px; display: grid; place-items: center; opacity: 0; transform: translateY(8px) scale(.96); transition: opacity 160ms ease, transform 160ms ease; }
+  body[data-visible="true"] .bar { opacity: 1; transform: translateY(0) scale(1); }
+  .rail { width: 172px; height: 6px; overflow: hidden; border-radius: 999px; background: rgba(226, 232, 240, .16); box-shadow: 0 16px 40px rgba(15, 23, 42, .24), 0 0 0 1px rgba(255,255,255,.10) inset; }
+  .fill { width: 100%; height: 100%; border-radius: inherit; transform-origin: left center; transform: scaleX(.26); background: linear-gradient(90deg, rgba(203,213,225,.76), rgba(241,245,249,.96)); }
+  .label { margin-top: 7px; color: rgba(248,250,252,.72); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-align: center; text-transform: uppercase; text-shadow: 0 1px 12px rgba(15, 23, 42, .4); }
+  body[data-tone="preparing"] .fill { transform: scaleX(.38); animation: breathe 1.2s ease-in-out infinite; }
+  body[data-tone="recording"] .fill { background: linear-gradient(90deg, rgba(125,211,252,.86), rgba(196,181,253,.96)); animation: breathe 900ms ease-in-out infinite; }
+  body[data-tone="transcribing"] .fill { background: linear-gradient(90deg, rgba(96,165,250,.72), rgba(248,250,252,.98), rgba(96,165,250,.72)); animation: sweep 1s ease-in-out infinite; transform: scaleX(1); }
+  body[data-tone="pasted"] .fill { background: linear-gradient(90deg, rgba(52,211,153,.86), rgba(187,247,208,.98)); transform: scaleX(1); }
+  body[data-tone="copied"] .fill { background: linear-gradient(90deg, rgba(147,197,253,.82), rgba(219,234,254,.98)); transform: scaleX(1); }
+  body[data-tone="error"] .fill { background: linear-gradient(90deg, rgba(251,191,36,.86), rgba(254,240,138,.98)); animation: pulse 700ms ease-in-out infinite; }
+  @keyframes breathe { 0%,100% { transform: scaleX(.42); opacity: .62; } 50% { transform: scaleX(1); opacity: 1; } }
+  @keyframes sweep { 0% { filter: brightness(.75); } 50% { filter: brightness(1.35); } 100% { filter: brightness(.75); } }
+  @keyframes pulse { 0%,100% { transform: scaleX(.72); opacity: .72; } 50% { transform: scaleX(1); opacity: 1; } }
+</style>
+</head>
+<body data-visible="false" data-tone="preparing">
+  <div class="bar" role="status" aria-live="polite">
+    <div class="rail"><div class="fill"></div></div>
+    <div class="label" id="label">Preparing mic</div>
+  </div>
+<script>
+  window.AuralisListeningOverlay = {
+    setState(payload) {
+      document.body.dataset.visible = String(Boolean(payload.visible));
+      document.body.dataset.tone = payload.tone || "preparing";
+      document.getElementById("label").textContent = payload.label || "Auralis";
+    }
+  };
+</script>
+</body>
+</html>`;
+
+function listeningOverlayUrl() {
+  return `data:text/html;charset=utf-8,${encodeURIComponent(LISTENING_OVERLAY_HTML)}`;
+}
+
+function listeningOverlayBounds() {
+  const { workArea } = screen.getPrimaryDisplay();
+  const width = 240;
+  const height = 58;
+  return {
+    height,
+    width,
+    x: Math.round(workArea.x + (workArea.width - width) / 2),
+    y: Math.round(workArea.y + workArea.height - height - 24),
+  };
+}
+
+function createListeningOverlayWindow() {
+  if (listeningOverlayWindow && !listeningOverlayWindow.isDestroyed()) {
+    return listeningOverlayWindow;
+  }
+
+  listeningOverlayReady = false;
+  listeningOverlayWindow = new BrowserWindow({
+    ...listeningOverlayBounds(),
+    alwaysOnTop: true,
+    backgroundColor: "#00000000",
+    focusable: false,
+    frame: false,
+    fullscreenable: false,
+    hasShadow: false,
+    movable: false,
+    resizable: false,
+    show: false,
+    skipTaskbar: true,
+    transparent: true,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+
+  listeningOverlayWindow.setIgnoreMouseEvents(true, { forward: true });
+  try {
+    listeningOverlayWindow.setAlwaysOnTop(true, "floating");
+  } catch {
+    listeningOverlayWindow.setAlwaysOnTop(true);
+  }
+  listeningOverlayWindow.webContents.once("did-finish-load", () => {
+    listeningOverlayReady = true;
+    updateListeningOverlayRenderer(
+      listeningOverlayPendingPayload ??
+        listeningOverlayPayloadForCapture(listeningOverlayLastCapture),
+    );
+  });
+  listeningOverlayWindow.on("closed", () => {
+    listeningOverlayWindow = null;
+    listeningOverlayReady = false;
+  });
+  listeningOverlayWindow.loadURL(listeningOverlayUrl());
+
+  return listeningOverlayWindow;
+}
+
+function destroyListeningOverlay() {
+  if (listeningOverlayFlashTimer !== null) {
+    clearTimeout(listeningOverlayFlashTimer);
+    listeningOverlayFlashTimer = null;
+  }
+  if (listeningOverlayWindow && !listeningOverlayWindow.isDestroyed()) {
+    listeningOverlayWindow.destroy();
+  }
+  listeningOverlayWindow = null;
+  listeningOverlayReady = false;
+  listeningOverlayPendingPayload = null;
+}
+
+function listeningOverlayPayloadForCapture(payload) {
+  switch (payload.status) {
+    case "starting":
+      return { label: "Preparing mic", tone: "preparing", visible: true };
+    case "listening":
+    case "recording":
+      return { label: "Listening", tone: "recording", visible: true };
+    case "transcribing":
+      return { label: "Transcribing", tone: "transcribing", visible: true };
+    default:
+      return { label: "Auralis", tone: "preparing", visible: false };
+  }
+}
+
+function updateListeningOverlayRenderer(payload) {
+  if (!payload.visible && (!listeningOverlayWindow || listeningOverlayWindow.isDestroyed())) {
+    listeningOverlayPendingPayload = payload;
+    return;
+  }
+
+  listeningOverlayPendingPayload = payload;
+  const overlay = payload.visible ? createListeningOverlayWindow() : listeningOverlayWindow;
+  if (!overlay || overlay.isDestroyed()) {
+    return;
+  }
+
+  overlay.setBounds(listeningOverlayBounds(), false);
+  if (payload.visible) {
+    overlay.showInactive();
+  } else {
+    overlay.hide();
+  }
+
+  if (!listeningOverlayReady) {
+    return;
+  }
+
+  overlay.webContents
+    .executeJavaScript(`window.AuralisListeningOverlay?.setState(${JSON.stringify(payload)})`, true)
+    .catch(() => undefined);
+}
+
+function updateListeningOverlayFromCapture(payload) {
+  listeningOverlayLastCapture = {
+    muteSystemAudio: Boolean(payload.muteSystemAudio),
+    status: payload.status,
+  };
+
+  if (listeningOverlayFlashTimer !== null) {
+    if (["idle", "unsupported"].includes(payload.status)) {
+      return;
+    }
+    clearTimeout(listeningOverlayFlashTimer);
+    listeningOverlayFlashTimer = null;
+  }
+
+  updateListeningOverlayRenderer(listeningOverlayPayloadForCapture(listeningOverlayLastCapture));
+}
+
+function flashPayloadForMessage(message) {
+  const body = typeof message === "string" ? message.trim().slice(0, 96) : "";
+  if (/fail|could not|no speech|nothing|error/i.test(body)) {
+    return { label: body || "Check mic", tone: "error", visible: true };
+  }
+  if (/paste|insert/i.test(body)) {
+    return { label: "Pasted", tone: "pasted", visible: true };
+  }
+  if (/copy|clipboard/i.test(body)) {
+    return { label: "Copied", tone: "copied", visible: true };
+  }
+  if (/transcrib/i.test(body)) {
+    return { label: "Transcribing", tone: "transcribing", visible: true };
+  }
+  return { label: body || "Auralis", tone: "recording", visible: true };
+}
+
+function flashListeningOverlay(message) {
+  updateListeningOverlayRenderer(flashPayloadForMessage(message));
+
+  if (listeningOverlayFlashTimer !== null) {
+    clearTimeout(listeningOverlayFlashTimer);
+  }
+
+  listeningOverlayFlashTimer = setTimeout(() => {
+    listeningOverlayFlashTimer = null;
+    updateListeningOverlayRenderer(listeningOverlayPayloadForCapture(listeningOverlayLastCapture));
+  }, 1400);
+  return true;
 }
 
 function isTrustedExternalUrl(url) {
@@ -1483,6 +1697,7 @@ function sendToRenderer(channel, payload) {
 
 function restoreSystemAudioAfterRendererExit() {
   rendererCaptureState = "idle";
+  updateListeningOverlayFromCapture({ muteSystemAudio: false, status: "idle" });
   void updateSystemAudioDucking({ muteSystemAudio: false, status: "idle" }).catch(() => undefined);
 }
 
@@ -1555,6 +1770,7 @@ function createMainWindow() {
 
   mainWindow.on("closed", () => {
     restoreSystemAudioAfterRendererExit();
+    destroyListeningOverlay();
     mainWindow = null;
   });
 }
@@ -1936,6 +2152,7 @@ ipcMain.on("auralis:desktop-capture-state", (event, payload) => {
     )
   ) {
     rendererCaptureState = payload.status;
+    updateListeningOverlayFromCapture(payload);
     void updateSystemAudioDucking(payload).catch(() => undefined);
   }
 });
@@ -1945,7 +2162,7 @@ ipcMain.handle("auralis:desktop-notify", (event, message) => {
     return failedDesktopAction("Desktop notifications are only available to Auralis.");
   }
 
-  notifyDesktop(message);
+  flashListeningOverlay(message);
   return successfulDesktopAction("Notification sent.");
 });
 
@@ -2037,7 +2254,7 @@ app.whenReady().then(() => {
   installAppMenu();
 
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
+    if (!mainWindow || mainWindow.isDestroyed()) {
       createMainWindow();
     } else {
       focusMainWindow();
@@ -2098,6 +2315,7 @@ app.on("before-quit", (event) => {
 
 app.on("will-quit", () => {
   stopHoldToTalk();
+  destroyListeningOverlay();
   stopWhisperWorker("Auralis is quitting.");
   globalShortcut.unregisterAll();
 });
