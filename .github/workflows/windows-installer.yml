@@ -47,7 +47,7 @@ jobs:
         run: |
           $packageVersion = node -p "require('./package.json').version"
           $isTagPush = "${{ startsWith(github.ref, 'refs/tags/v') }}" -eq "true"
-          $isMainPush = "${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}" -eq "true"
+          $isPublicMainPush = "${{ github.repository == 'chrisduvillard/Auralis' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}" -eq "true"
           $releaseVersion = $packageVersion
           $releaseTag = "v$packageVersion"
 
@@ -56,7 +56,7 @@ jobs:
               throw "Release tag $env:GITHUB_REF_NAME must match package.json version v$packageVersion."
             }
             $releaseTag = $env:GITHUB_REF_NAME
-          } elseif ($isMainPush) {
+          } elseif ($isPublicMainPush) {
             $parts = $packageVersion.Split(".")
             if ($parts.Length -ne 3) {
               throw "Expected semantic package version x.y.z, got $packageVersion."
@@ -109,7 +109,7 @@ jobs:
       - name: Assert Windows release assets
         shell: pwsh
         env:
-          AURALIS_REQUIRE_UPDATE_METADATA: ${{ (github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))) && '1' || '0' }}
+          AURALIS_REQUIRE_UPDATE_METADATA: ${{ (github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || (github.repository == 'chrisduvillard/Auralis' && github.ref == 'refs/heads/main'))) && '1' || '0' }}
         run: node scripts/assert-windows-release-assets.cjs
 
       - name: Smoke installed Windows app

@@ -181,7 +181,9 @@ describe("desktop app packaging config", () => {
 
     expect(workflow).toContain("Resolve updater release version");
     expect(workflow).toContain("npm version $releaseVersion --no-git-tag-version");
-    expect(workflow).toContain("github.event_name == 'push' && github.ref == 'refs/heads/main'");
+    expect(workflow).toContain(
+      "github.repository == 'chrisduvillard/Auralis' && github.event_name == 'push' && github.ref == 'refs/heads/main'",
+    );
     expect(workflow).toContain("release-windows-installer:");
     expect(workflow).toContain("startsWith(github.ref, 'refs/tags/v')");
     expect(workflow).toContain("github.repository == 'chrisduvillard/Auralis'");
