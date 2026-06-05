@@ -1,0 +1,124 @@
+{
+  "name": "auralis",
+  "version": "0.1.1",
+  "description": "Local desktop-first microphone transcription app with opt-in persisted history.",
+  "private": true,
+  "files": [
+    "build",
+    "dist",
+    "electron",
+    "scripts",
+    "package.json"
+  ],
+  "packageManager": "npm@10.9.2",
+  "main": "electron/main.cjs",
+  "engines": {
+    "node": ">=22.12.0",
+    "npm": ">=10"
+  },
+  "scripts": {
+    "dev": "vite",
+    "desktop": "npm run build && node scripts/run-electron.cjs .",
+    "desktop:dev": "vite --host 127.0.0.1",
+    "desktop:check": "npm run build && AURALIS_ALLOW_NO_SANDBOX=1 node scripts/run-electron.cjs --version",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "lint": "biome check biome.json index.html vite.config.ts src electron scripts vendor",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "coverage": "vitest run --coverage",
+    "desktop:smoke": "npm run build && AURALIS_ALLOW_NO_SANDBOX=1 AURALIS_SMOKE_QUIT_AFTER_READY=1 node scripts/run-electron.cjs .",
+    "stt:proof": "node scripts/stt-proof-harness.cjs",
+    "package:win": "npm run build && node scripts/package-windows.cjs nsis",
+    "package:win:dir": "npm run build && node scripts/package-windows.cjs dir"
+  },
+  "keywords": [
+    "speech-to-text",
+    "voice",
+    "transcription",
+    "desktop",
+    "vite",
+    "typescript",
+    "electron"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "build": {
+    "appId": "com.chrisduvillard.auralis",
+    "productName": "Auralis",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "chrisduvillard",
+        "repo": "auralis-public"
+      }
+    ],
+    "icon": "build/icon.png",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "build/icon.*",
+      "dist/**/*",
+      "electron/**/*",
+      "scripts/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "scripts/transcribe-local-whisper.py",
+      "scripts/bootstrap-local-whisper.py"
+    ],
+    "extraMetadata": {
+      "main": "electron/main.cjs"
+    },
+    "toolsets": {
+      "winCodeSign": "1.1.0"
+    },
+    "win": {
+      "artifactName": "Auralis-Setup-${version}.${ext}",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false,
+      "oneClick": false,
+      "perMachine": false,
+      "shortcutName": "Auralis"
+    }
+  },
+  "overrides": {
+    "@electron/asar": "4.2.0",
+    "electron": {
+      "@electron/get": "3.1.0"
+    },
+    "global-agent": "4.1.3",
+    "rimraf": "$rimraf",
+    "tmp": "^0.2.6"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.15",
+    "@vitest/coverage-v8": "^4.1.6",
+    "electron": "^39.8.10",
+    "electron-builder": "^26.8.1",
+    "jsdom": "^29.1.1",
+    "rimraf": "file:vendor/rimraf-compat",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.12",
+    "vitest": "^4.1.6"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.3",
+    "lodash.isequal": "file:vendor/lodash.isequal-compat",
+    "uiohook-napi": "1.5.5"
+  }
+}

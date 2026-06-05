@@ -1,0 +1,13 @@
+{
+  "name": "rimraf",
+  "version": "4.4.1",
+  "description": "Auralis compatibility shim for callback-style rimraf consumers used by Electron packaging dependencies.",
+  "main": "index.cjs",
+  "bin": {
+    "rimraf": "bin.cjs"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=16"
+  }
+}

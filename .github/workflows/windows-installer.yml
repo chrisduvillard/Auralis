@@ -1,0 +1,168 @@
+name: Windows installer
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+concurrency:
+  group: windows-installer-update-channel
+  cancel-in-progress: false
+
+jobs:
+  build-windows-installer:
+    runs-on: windows-2025
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate release tag matches package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $packageVersion = node -p "require('./package.json').version"
+          if ($env:GITHUB_REF_NAME -ne "v$packageVersion") {
+            throw "Release tag $env:GITHUB_REF_NAME must match package.json version v$packageVersion."
+          }
+
+      - name: Prepare Windows signing certificate
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE_P12: ${{ secrets.WINDOWS_CERTIFICATE_P12 }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_P12) -or [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)) {
+            "CSC_IDENTITY_AUTO_DISCOVERY=false" | Out-File -FilePath $env:GITHUB_ENV -Append
+            if ("${{ startsWith(github.ref, 'refs/tags/v') }}" -eq "true") {
+              throw "Signing certificate is required for public Windows release publication. Configure WINDOWS_CERTIFICATE_P12 and WINDOWS_CERTIFICATE_PASSWORD before pushing v* release tags."
+            }
+            Write-Host "Windows signing certificate not configured; building unsigned non-release artifact only."
+            exit 0
+          }
+
+          $certPath = Join-Path $env:RUNNER_TEMP "auralis-windows-signing.p12"
+          [IO.File]::WriteAllBytes($certPath, [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE_P12))
+          "CSC_LINK=$certPath" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "CSC_KEY_PASSWORD=$env:WINDOWS_CERTIFICATE_PASSWORD" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "AURALIS_WINDOWS_SIGNING=1" | Out-File -FilePath $env:GITHUB_ENV -Append
+          Write-Host "Windows signing certificate configured for electron-builder."
+
+      - name: Build Windows NSIS installer
+        run: npm run package:win
+
+      - name: Generate Windows update metadata
+        shell: pwsh
+        run: node scripts/write-windows-update-metadata.cjs
+
+      - name: Assert Windows release assets
+        shell: pwsh
+        env:
+          AURALIS_REQUIRE_UPDATE_METADATA: ${{ startsWith(github.ref, 'refs/tags/v') && '1' || '0' }}
+        run: node scripts/assert-windows-release-assets.cjs
+
+      - name: Smoke installed Windows app
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $installer = Get-ChildItem -Path "release" -Filter "Auralis-Setup-*.exe" | Select-Object -First 1
+          if ($null -eq $installer) {
+            throw "Auralis Windows installer was not produced."
+          }
+
+          $installDir = Join-Path $env:LOCALAPPDATA "Programs\Auralis"
+          if (Test-Path $installDir) {
+            Remove-Item -Recurse -Force $installDir
+          }
+
+          Write-Host "Installing $($installer.FullName) to default per-user directory: $installDir"
+          $installProcess = Start-Process -FilePath $installer.FullName -ArgumentList "/S" -Wait -PassThru
+          if ($installProcess.ExitCode -ne 0) {
+            throw "Auralis installer exited with code $($installProcess.ExitCode)."
+          }
+
+          $appExe = Join-Path $installDir "Auralis.exe"
+          if (-not (Test-Path $appExe)) {
+            $appExe = Get-ChildItem -Path (Join-Path $env:LOCALAPPDATA "Programs") -Filter "Auralis.exe" -Recurse | Select-Object -First 1 -ExpandProperty FullName
+          }
+          if ([string]::IsNullOrWhiteSpace($appExe) -or -not (Test-Path $appExe)) {
+            throw "Installed Auralis.exe was not found under $installDir."
+          }
+
+          Write-Host "Launching installed app smoke: $appExe"
+          $env:AURALIS_SMOKE_QUIT_AFTER_READY = "1"
+          $smokeProcess = Start-Process -FilePath $appExe -Wait -PassThru
+          if ($smokeProcess.ExitCode -ne 0) {
+            throw "Installed Auralis app smoke exited with code $($smokeProcess.ExitCode)."
+          }
+
+          $uninstaller = Get-ChildItem -Path $installDir -Filter "Uninstall Auralis.exe" -Recurse | Select-Object -First 1
+          if ($null -ne $uninstaller) {
+            Write-Host "Uninstalling smoke install: $($uninstaller.FullName)"
+            $uninstallProcess = Start-Process -FilePath $uninstaller.FullName -ArgumentList "/S" -Wait -PassThru
+            if ($uninstallProcess.ExitCode -ne 0) {
+              throw "Auralis uninstaller exited with code $($uninstallProcess.ExitCode)."
+            }
+          }
+
+      - name: Smoke Windows auto-paste mechanism
+        shell: pwsh
+        run: ./scripts/smoke-windows-autopaste.ps1
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: Auralis-Windows-Installer
+          path: |
+            release/Auralis-Setup-*.exe
+            release/Auralis-Setup-*.exe.blockmap
+            release/latest*.yml
+          if-no-files-found: error
+          retention-days: 30
+
+  release-windows-installer:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build-windows-installer
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download installer artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: Auralis-Windows-Installer
+          path: release
+
+      - name: Upload signed tagged installer to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          target_commitish: ${{ github.sha }}
+          make_latest: true
+          files: |
+            release/Auralis-Setup-*.exe
+            release/Auralis-Setup-*.exe.blockmap
+            release/latest*.yml
+          fail_on_unmatched_files: true

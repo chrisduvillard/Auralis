@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+      - name: Run tests
+        run: npm test -- --run
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint and format check
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+
+      - name: Check desktop shell
+        run: npm run desktop:check
+
+      - name: Smoke desktop launch
+        run: xvfb-run -a npm run desktop:smoke

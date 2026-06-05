@@ -1,0 +1,7 @@
+{
+  "name": "lodash.isequal",
+  "version": "4.5.0",
+  "description": "Auralis compatibility shim for electron-updater using node:util.isDeepStrictEqual.",
+  "main": "index.cjs",
+  "license": "MIT"
+}

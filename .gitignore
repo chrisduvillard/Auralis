@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Build and coverage output
+dist/
+release/
+coverage/
+coverage-final.json
+coverage-summary.json
+
+# Local CES state/evidence; keep this out of public artifacts
+.ces/
+
+# Local environment/editor/agent noise
+.env
+.env.*
+!.env.example
+.hermes/
+.Hermes/
+.DS_Store
