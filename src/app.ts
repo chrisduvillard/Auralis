@@ -103,6 +103,7 @@ interface DesktopInfo {
 }
 
 interface DesktopCaptureStatePayload {
+  micLevel: number;
   muteSystemAudio: boolean;
   status: AppStatus;
 }
@@ -453,11 +454,13 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
       return;
     }
 
+    const micLevel = state.status === "recording" ? clampLevel(state.micLevel) : 0;
     const payload: DesktopCaptureStatePayload = {
+      micLevel,
       muteSystemAudio: shouldMuteSystemAudioForStatus(),
       status: state.status,
     };
-    const payloadKey = `${payload.status}:${payload.muteSystemAudio}`;
+    const payloadKey = `${payload.status}:${payload.muteSystemAudio}:${payload.micLevel.toFixed(2)}`;
     if (lastPublishedCaptureStateKey === payloadKey) {
       return;
     }

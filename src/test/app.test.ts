@@ -25,7 +25,11 @@ type MutableWindow = Window &
         pasteTargetToken?: string | null,
       ) => Promise<{ ok: boolean; message: string; pasted: boolean }>;
       platform: string;
-      setCaptureState?: (payload: { muteSystemAudio: boolean; status: string }) => void;
+      setCaptureState?: (payload: {
+        micLevel?: number;
+        muteSystemAudio: boolean;
+        status: string;
+      }) => void;
       shortcutLabel: string;
       transcribeAudio?: (request: {
         audioData: ArrayBuffer;
@@ -180,6 +184,30 @@ class ManualStartMediaRecorder extends FakeMediaRecorder {
 
   emitStart(): void {
     this.onstart?.(new Event("start"));
+  }
+}
+
+class FakeAudioContext {
+  createAnalyser(): AnalyserNode {
+    return {
+      fftSize: 0,
+      getByteTimeDomainData(samples: Uint8Array): void {
+        samples.fill(128);
+        samples[0] = 255;
+        samples[1] = 0;
+      },
+    } as unknown as AnalyserNode;
+  }
+
+  createMediaStreamSource(_stream: MediaStream): MediaStreamAudioSourceNode {
+    return {
+      connect: () => undefined,
+      disconnect: () => undefined,
+    } as unknown as MediaStreamAudioSourceNode;
+  }
+
+  close(): Promise<void> {
+    return Promise.resolve();
   }
 }
 
@@ -880,15 +908,19 @@ describe("Auralis app UI", () => {
       pasted: true,
     }));
     const notify = vi.fn(async (message: string) => ({ message, ok: true }));
-    const captureStates: Array<{ muteSystemAudio: boolean; status: string }> = [];
+    const captureStates: Array<{ micLevel?: number; muteSystemAudio: boolean; status: string }> =
+      [];
     Object.defineProperty(window, "auralisDesktop", {
       configurable: true,
       value: {
         notify,
         pasteText,
         platform: "linux",
-        setCaptureState: (payload: { muteSystemAudio: boolean; status: string }) =>
-          captureStates.push(payload),
+        setCaptureState: (payload: {
+          micLevel?: number;
+          muteSystemAudio: boolean;
+          status: string;
+        }) => captureStates.push(payload),
         shortcutLabel: "Ctrl + Alt + Space toggles from any app",
       },
     });
@@ -901,7 +933,9 @@ describe("Auralis app UI", () => {
       }),
     );
     await vi.waitFor(() =>
-      expect(captureStates).toContainEqual({ muteSystemAudio: true, status: "listening" }),
+      expect(captureStates).toContainEqual(
+        expect.objectContaining({ muteSystemAudio: true, status: "listening" }),
+      ),
     );
     await vi.waitFor(() =>
       expect(notify).toHaveBeenCalledWith(expect.stringContaining("Recording")),
@@ -915,7 +949,9 @@ describe("Auralis app UI", () => {
 
     await vi.waitFor(() => expect(pasteText).toHaveBeenCalledWith("send this to the focused app"));
     await vi.waitFor(() =>
-      expect(captureStates.at(-1)).toEqual({ muteSystemAudio: false, status: "idle" }),
+      expect(captureStates.at(-1)).toEqual(
+        expect.objectContaining({ muteSystemAudio: false, status: "idle" }),
+      ),
     );
     await vi.waitFor(() =>
       expect(root.textContent).toContain("Inserted: send this to the focused app"),
@@ -1073,7 +1109,8 @@ describe("Auralis app UI", () => {
 
   it("publishes the system-audio mute preference while desktop recording is active", async () => {
     installFakeMediaRecorder();
-    const captureStates: Array<{ muteSystemAudio: boolean; status: string }> = [];
+    const captureStates: Array<{ micLevel?: number; muteSystemAudio: boolean; status: string }> =
+      [];
     Object.defineProperty(window, "auralisDesktop", {
       configurable: true,
       value: {
@@ -1083,8 +1120,11 @@ describe("Auralis app UI", () => {
           pasted: true,
         }),
         platform: "linux",
-        setCaptureState: (payload: { muteSystemAudio: boolean; status: string }) =>
-          captureStates.push(payload),
+        setCaptureState: (payload: {
+          micLevel?: number;
+          muteSystemAudio: boolean;
+          status: string;
+        }) => captureStates.push(payload),
         shortcutLabel: "Ctrl + Alt + Space toggles from any app",
         transcribeAudio: async () => ({
           message: "Transcribed locally with Whisper.",
@@ -1102,14 +1142,20 @@ describe("Auralis app UI", () => {
     expect(muteSystemAudio?.checked).toBe(true);
     button(root, "Start recording").click();
     await vi.waitFor(() =>
-      expect(captureStates).toContainEqual({ muteSystemAudio: true, status: "recording" }),
+      expect(captureStates).toContainEqual(
+        expect.objectContaining({ muteSystemAudio: true, status: "recording" }),
+      ),
     );
     button(root, "Stop & transcribe").click();
     await vi.waitFor(() =>
-      expect(captureStates).toContainEqual({ muteSystemAudio: false, status: "transcribing" }),
+      expect(captureStates).toContainEqual(
+        expect.objectContaining({ muteSystemAudio: false, status: "transcribing" }),
+      ),
     );
     await vi.waitFor(() =>
-      expect(captureStates.at(-1)).toEqual({ muteSystemAudio: false, status: "idle" }),
+      expect(captureStates.at(-1)).toEqual(
+        expect.objectContaining({ muteSystemAudio: false, status: "idle" }),
+      ),
     );
   });
 
@@ -1512,12 +1558,61 @@ describe("Auralis app UI", () => {
     });
   });
 
+  it("streams microphone activity into the passive desktop overlay state", async () => {
+    vi.useFakeTimers();
+    installFakeMediaRecorder();
+    Object.defineProperty(window, "AudioContext", {
+      configurable: true,
+      value: FakeAudioContext,
+    });
+    const captureStates: Array<{ micLevel?: number; muteSystemAudio: boolean; status: string }> =
+      [];
+
+    Object.defineProperty(window, "auralisDesktop", {
+      configurable: true,
+      value: {
+        platform: "linux",
+        setCaptureState: (payload: {
+          micLevel?: number;
+          muteSystemAudio: boolean;
+          status: string;
+        }) => {
+          captureStates.push(payload);
+        },
+        shortcutLabel: "Ctrl + Alt + Space toggles from any app",
+        transcribeAudio: async () => ({
+          message: "Transcribed locally with Whisper.",
+          ok: true,
+          text: "overlay meter transcript",
+        }),
+      },
+    });
+    enableTranscriptHistory({
+      modelId: "desktop-whisper-base",
+      providerId: "desktop-whisper",
+      saveTranscriptHistory: false,
+    });
+
+    const { root } = mountApp();
+    button(root, "Start recording").click();
+
+    await vi.waitFor(() => expect(captureStates.at(-1)?.status).toBe("recording"));
+    await vi.advanceTimersByTimeAsync(140);
+
+    expect(
+      captureStates.some(
+        (payload) => payload.status === "recording" && (payload.micLevel ?? 0) > 0.1,
+      ),
+    ).toBe(true);
+  });
+
   it("keeps shortcut recordings alive when stop arrives while the microphone is still preparing", async () => {
     vi.useFakeTimers();
     const streamRequest = deferred<MediaStream>();
     const stoppedTracks: string[] = [];
     const transcribeRequests: Array<{ audioData: ArrayBuffer }> = [];
-    const captureStates: Array<{ muteSystemAudio: boolean; status: string }> = [];
+    const captureStates: Array<{ micLevel?: number; muteSystemAudio: boolean; status: string }> =
+      [];
 
     Object.defineProperty(window, "MediaRecorder", {
       configurable: true,
@@ -1538,7 +1633,11 @@ describe("Auralis app UI", () => {
           pasted: true,
         }),
         platform: "linux",
-        setCaptureState: (payload: { muteSystemAudio: boolean; status: string }) => {
+        setCaptureState: (payload: {
+          micLevel?: number;
+          muteSystemAudio: boolean;
+          status: string;
+        }) => {
           captureStates.push(payload);
         },
         shortcutLabel: "Ctrl + Alt + Space toggles from any app",

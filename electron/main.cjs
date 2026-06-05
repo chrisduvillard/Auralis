@@ -5,7 +5,6 @@ const {
   globalShortcut,
   ipcMain,
   Menu,
-  Notification,
   screen,
   session,
   shell,
@@ -76,7 +75,7 @@ let mainWindow = null;
 let listeningOverlayWindow = null;
 let listeningOverlayReady = false;
 let listeningOverlayFlashTimer = null;
-let listeningOverlayLastCapture = { muteSystemAudio: false, status: "idle" };
+let listeningOverlayLastCapture = { micLevel: 0, muteSystemAudio: false, status: "idle" };
 let listeningOverlayPendingPayload = null;
 let lastExternalFocusTarget = null;
 let cachedWhisperPython = null;
@@ -127,10 +126,10 @@ const LISTENING_OVERLAY_HTML = `<!doctype html>
   .bar { position: absolute; left: 16px; right: 16px; bottom: 12px; height: 28px; display: grid; place-items: center; opacity: 0; transform: translateY(8px) scale(.96); transition: opacity 160ms ease, transform 160ms ease; }
   body[data-visible="true"] .bar { opacity: 1; transform: translateY(0) scale(1); }
   .rail { width: 172px; height: 6px; overflow: hidden; border-radius: 999px; background: rgba(226, 232, 240, .16); box-shadow: 0 16px 40px rgba(15, 23, 42, .24), 0 0 0 1px rgba(255,255,255,.10) inset; }
-  .fill { width: 100%; height: 100%; border-radius: inherit; transform-origin: left center; transform: scaleX(.26); background: linear-gradient(90deg, rgba(203,213,225,.76), rgba(241,245,249,.96)); }
+  .fill { width: 100%; height: 100%; border-radius: inherit; transform-origin: left center; transform: scaleX(.26); background: linear-gradient(90deg, rgba(203,213,225,.76), rgba(241,245,249,.96)); transition: transform 90ms ease-out, filter 120ms ease-out; }
   .label { margin-top: 7px; color: rgba(248,250,252,.72); font-size: 11px; font-weight: 600; letter-spacing: .08em; text-align: center; text-transform: uppercase; text-shadow: 0 1px 12px rgba(15, 23, 42, .4); }
   body[data-tone="preparing"] .fill { transform: scaleX(.38); animation: breathe 1.2s ease-in-out infinite; }
-  body[data-tone="recording"] .fill { background: linear-gradient(90deg, rgba(125,211,252,.86), rgba(196,181,253,.96)); animation: breathe 900ms ease-in-out infinite; }
+  body[data-tone="recording"] .fill { background: linear-gradient(90deg, rgba(125,211,252,.86), rgba(196,181,253,.96)); transform: scaleX(var(--audio-level, .32)); filter: brightness(calc(.82 + var(--audio-level, .32) * .42)); }
   body[data-tone="transcribing"] .fill { background: linear-gradient(90deg, rgba(96,165,250,.72), rgba(248,250,252,.98), rgba(96,165,250,.72)); animation: sweep 1s ease-in-out infinite; transform: scaleX(1); }
   body[data-tone="pasted"] .fill { background: linear-gradient(90deg, rgba(52,211,153,.86), rgba(187,247,208,.98)); transform: scaleX(1); }
   body[data-tone="copied"] .fill { background: linear-gradient(90deg, rgba(147,197,253,.82), rgba(219,234,254,.98)); transform: scaleX(1); }
@@ -148,8 +147,11 @@ const LISTENING_OVERLAY_HTML = `<!doctype html>
 <script>
   window.AuralisListeningOverlay = {
     setState(payload) {
+      const level = Number.isFinite(payload.level) ? Math.max(0.18, Math.min(1, payload.level)) : 0.26;
+      document.documentElement.style.setProperty("--audio-level", level.toFixed(3));
       document.body.dataset.visible = String(Boolean(payload.visible));
       document.body.dataset.tone = payload.tone || "preparing";
+      document.body.dataset.level = level.toFixed(3);
       document.getElementById("label").textContent = payload.label || "Auralis";
     }
   };
@@ -234,17 +236,26 @@ function destroyListeningOverlay() {
   listeningOverlayPendingPayload = null;
 }
 
+function clampOverlayLevel(level) {
+  return Math.max(0, Math.min(1, Number.isFinite(level) ? level : 0));
+}
+
 function listeningOverlayPayloadForCapture(payload) {
   switch (payload.status) {
     case "starting":
-      return { label: "Preparing mic", tone: "preparing", visible: true };
+      return { label: "Preparing mic", level: 0.34, tone: "preparing", visible: true };
     case "listening":
     case "recording":
-      return { label: "Listening", tone: "recording", visible: true };
+      return {
+        label: "Listening",
+        level: listeningOverlayLastCapture.micLevel,
+        tone: "recording",
+        visible: true,
+      };
     case "transcribing":
-      return { label: "Transcribing", tone: "transcribing", visible: true };
+      return { label: "Transcribing", level: 1, tone: "transcribing", visible: true };
     default:
-      return { label: "Auralis", tone: "preparing", visible: false };
+      return { label: "Auralis", level: 0, tone: "preparing", visible: false };
   }
 }
 
@@ -278,6 +289,7 @@ function updateListeningOverlayRenderer(payload) {
 
 function updateListeningOverlayFromCapture(payload) {
   listeningOverlayLastCapture = {
+    micLevel: clampOverlayLevel(payload.micLevel),
     muteSystemAudio: Boolean(payload.muteSystemAudio),
     status: payload.status,
   };
@@ -296,18 +308,18 @@ function updateListeningOverlayFromCapture(payload) {
 function flashPayloadForMessage(message) {
   const body = typeof message === "string" ? message.trim().slice(0, 96) : "";
   if (/fail|could not|no speech|nothing|error/i.test(body)) {
-    return { label: body || "Check mic", tone: "error", visible: true };
+    return { label: body || "Check mic", level: 0.82, tone: "error", visible: true };
   }
   if (/paste|insert/i.test(body)) {
-    return { label: "Pasted", tone: "pasted", visible: true };
+    return { label: "Pasted", level: 1, tone: "pasted", visible: true };
   }
   if (/copy|clipboard/i.test(body)) {
-    return { label: "Copied", tone: "copied", visible: true };
+    return { label: "Copied", level: 1, tone: "copied", visible: true };
   }
   if (/transcrib/i.test(body)) {
-    return { label: "Transcribing", tone: "transcribing", visible: true };
+    return { label: "Transcribing", level: 1, tone: "transcribing", visible: true };
   }
-  return { label: body || "Auralis", tone: "recording", visible: true };
+  return { label: body || "Auralis", level: 0.42, tone: "recording", visible: true };
 }
 
 function flashListeningOverlay(message) {
@@ -1673,18 +1685,7 @@ async function installLatestUpdate() {
 }
 
 function notifyDesktop(message) {
-  const body = typeof message === "string" ? message.trim().slice(0, 240) : "";
-
-  if (!body || !Notification.isSupported()) {
-    return false;
-  }
-
-  try {
-    new Notification({ body, title: "Auralis" }).show();
-    return true;
-  } catch {
-    return false;
-  }
+  return flashListeningOverlay(message);
 }
 
 function sendToRenderer(channel, payload) {

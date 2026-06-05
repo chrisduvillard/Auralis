@@ -670,8 +670,13 @@ describe("desktop app packaging config", () => {
     expect(mainProcess).toContain("setIgnoreMouseEvents(true");
     expect(mainProcess).toContain("showInactive()");
     expect(mainProcess).toContain("updateListeningOverlayFromCapture(payload)");
+    expect(mainProcess).toContain("--audio-level");
+    expect(mainProcess).toContain("micLevel: clampOverlayLevel(payload.micLevel)");
+    expect(mainProcess).toContain("level: listeningOverlayLastCapture.micLevel");
     expect(mainProcess).toContain("flashListeningOverlay(message)");
     expect(mainProcess).toContain("destroyListeningOverlay()");
+    expect(mainProcess).not.toContain("new Notification");
+    expect(mainProcess).not.toContain("Notification,");
     expect(mainProcess).toContain("if (!mainWindow || mainWindow.isDestroyed())");
     expect(mainProcess).not.toContain("focusListeningOverlay");
     expect(preload).not.toContain("listening-overlay");
