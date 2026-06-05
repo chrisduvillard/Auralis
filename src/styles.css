@@ -128,10 +128,20 @@ input:disabled {
 }
 
 .brand-name {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.42rem;
   color: var(--ink);
   font-size: 0.98rem;
   font-weight: 650;
   letter-spacing: -0.01em;
+}
+
+.brand-version {
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+  font-weight: 560;
+  letter-spacing: 0;
 }
 
 .brand-subtitle {
@@ -184,43 +194,56 @@ input:disabled {
 
 .recorder-card {
   display: grid;
-  grid-template-columns: minmax(0, 1.28fr) minmax(290px, 0.72fr);
-  gap: 1rem;
-  min-height: 390px;
-  padding: 1rem;
-  border-radius: 28px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+  min-height: 0;
+  padding: 0.85rem;
+  border-radius: 22px;
 }
 
 .recorder-card__copy,
-.recorder-panel,
+.capture-strip,
 .panel,
 .history-item {
-  border-radius: 24px;
+  border-radius: 18px;
 }
 
 .recorder-card__copy,
-.recorder-panel {
-  padding: clamp(1.25rem, 2vw, 2rem);
+.capture-strip {
+  padding: clamp(0.9rem, 1.5vw, 1.25rem);
 }
 
 .recorder-card__copy {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 1.2rem;
-  background:
-    radial-gradient(circle at 12% 8%, rgba(124, 124, 255, 0.1), transparent 18rem),
-    rgba(255, 255, 255, 0.018);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.55rem 1rem;
+  background: rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(255, 255, 255, 0.045);
+}
+
+.recorder-card__copy .eyebrow,
+.recorder-card__copy .status-card__meta,
+.recorder-card__copy .keyboard-hint {
+  grid-column: 1 / -1;
+}
+
+.capture-strip {
+  display: grid;
+  grid-template-columns: auto minmax(160px, 0.8fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 0.9rem;
+  background: rgba(0, 0, 0, 0.14);
   border: 1px solid rgba(255, 255, 255, 0.055);
 }
 
-.recorder-panel {
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  text-align: center;
-  background: rgba(0, 0, 0, 0.18);
-  border: 1px solid rgba(255, 255, 255, 0.07);
+.capture-strip__state {
+  min-width: 8rem;
+}
+
+.flow-hint {
+  max-width: none;
+  padding: 0 0.35rem 0.15rem;
 }
 
 .eyebrow {
@@ -240,10 +263,10 @@ h2 {
 }
 
 h1 {
-  max-width: 15ch;
-  font-size: clamp(1.85rem, 4vw, 2.75rem);
-  line-height: 0.98;
-  font-weight: 600;
+  max-width: 28ch;
+  font-size: clamp(1.18rem, 2.1vw, 1.65rem);
+  line-height: 1.08;
+  font-weight: 610;
   text-wrap: balance;
 }
 
@@ -254,9 +277,10 @@ h2 {
 }
 
 .hero__lede {
+  grid-column: 1 / -1;
   max-width: 54ch;
   color: var(--ink-muted);
-  font-size: 0.98rem;
+  font-size: 0.96rem;
 }
 
 .hero__actions,
@@ -267,6 +291,34 @@ h2 {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.75rem;
+}
+
+.shortcut-map {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: -0.25rem 0 0.85rem;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+}
+
+.shortcut-map__item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  padding: 0.24rem 0.44rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.shortcut-map__item strong {
+  color: var(--ink-muted);
+  font-weight: 620;
+}
+
+.shortcut-map kbd {
+  color: var(--ink);
+  font: inherit;
 }
 
 .button {
@@ -313,6 +365,12 @@ h2 {
   min-width: 10.5rem;
 }
 
+.button--record[data-capture="active"] {
+  border-color: rgba(255, 107, 107, 0.42);
+  background: linear-gradient(135deg, #d95f70, #f8c572);
+  box-shadow: 0 10px 34px rgba(255, 107, 107, 0.24);
+}
+
 .button--secondary {
   color: #f7f8f8;
   border-color: rgba(255, 255, 255, 0.16);
@@ -334,64 +392,6 @@ h2 {
 .keyboard-hint {
   color: var(--ink-soft);
   font-size: 0.86rem;
-}
-
-.record-orb {
-  position: relative;
-  display: grid;
-  place-items: center;
-  width: min(48vw, 168px);
-  height: min(48vw, 168px);
-  margin-bottom: 1.35rem;
-  border-radius: 999px;
-  background:
-    radial-gradient(
-      circle,
-      rgba(255, 255, 255, 0.14),
-      rgba(255, 255, 255, 0.035) 44%,
-      transparent 66%
-    ),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
-  box-shadow:
-    inset 0 0 34px rgba(255, 255, 255, 0.05),
-    0 0 58px rgba(124, 124, 255, 0.1);
-}
-
-.record-orb__core,
-.record-orb__ring {
-  position: absolute;
-  border-radius: 999px;
-}
-
-.record-orb__core {
-  width: 48%;
-  height: 48%;
-  background: linear-gradient(135deg, #6973ee, #9b9cff);
-  box-shadow: 0 0 42px rgba(124, 124, 255, 0.28);
-}
-
-.record-orb__ring {
-  width: 74%;
-  height: 74%;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.record-orb[data-active="true"] .record-orb__core {
-  background: linear-gradient(135deg, #ff6b6b, #f8c572);
-  animation: pulse-recording 1.35s ease-in-out infinite;
-}
-
-@keyframes pulse-recording {
-  0%,
-  100% {
-    transform: scale(0.94);
-    box-shadow: 0 0 34px rgba(255, 107, 107, 0.35);
-  }
-
-  50% {
-    transform: scale(1.04);
-    box-shadow: 0 0 76px rgba(255, 107, 107, 0.58);
-  }
 }
 
 .status-card__label {
@@ -446,13 +446,17 @@ h2 {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1.42fr) minmax(300px, 0.82fr);
-  gap: 1rem;
-  margin-top: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.85rem;
+  margin-top: 0.85rem;
 }
 
 .workspace[data-layout="focus"] {
   margin-bottom: 0.85rem;
+}
+
+.transcript-panel {
+  min-height: min(58vh, 560px);
 }
 
 .setup-checklist {
@@ -497,14 +501,14 @@ h2 {
 
 .transcript-area {
   width: 100%;
-  min-height: 330px;
+  min-height: 430px;
   resize: vertical;
-  border: 1px solid var(--border);
-  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 16px;
   padding: 1rem;
   color: var(--ink);
   background: rgba(0, 0, 0, 0.2);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.015);
 }
 
 .transcript-area::placeholder,
@@ -544,6 +548,41 @@ h2 {
   border: 1px solid var(--border);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.03);
+}
+
+.advanced-settings {
+  margin-top: 0.85rem;
+}
+
+.advanced-settings__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  cursor: pointer;
+}
+
+.advanced-settings__summary .eyebrow {
+  display: block;
+  margin-bottom: 0.18rem;
+}
+
+.advanced-settings__title {
+  display: block;
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 620;
+}
+
+.advanced-settings__summary small {
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+}
+
+.advanced-settings__content {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: 1rem;
 }
 
 .engine-settings summary {
@@ -830,6 +869,7 @@ h2 {
 .field select:focus,
 .field input:focus-visible,
 .engine-settings summary:focus-visible,
+.advanced-settings__summary:focus-visible,
 .history-summary:focus-visible {
   outline: 3px solid rgba(124, 124, 255, 0.3);
   outline-offset: 3px;
@@ -843,7 +883,7 @@ h2 {
   }
 
   h1 {
-    max-width: 14ch;
+    max-width: 28ch;
   }
 }
 
@@ -873,6 +913,11 @@ h2 {
 
   .recorder-card {
     padding: 0.75rem;
+  }
+
+  .recorder-card__copy,
+  .capture-strip {
+    grid-template-columns: 1fr;
   }
 
   .history-tools {

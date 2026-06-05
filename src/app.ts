@@ -224,6 +224,11 @@ function clampLevel(level: number): number {
   return Math.max(0, Math.min(1, Number.isFinite(level) ? level : 0));
 }
 
+function ensureTrailingDictationSpace(text: string): string {
+  const value = text.trimEnd();
+  return value ? `${value} ` : "";
+}
+
 function pluralize(count: number, singular: string, plural = `${singular}s`): string {
   return `${count} ${count === 1 ? singular : plural}`;
 }
@@ -495,8 +500,8 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
       <header class="app-topbar" aria-label="Auralis app header">
         <div class="brand-lockup">
           <span class="brand-mark" aria-hidden="true">A</span>
-          <div>
-            <p class="brand-name">Auralis</p>
+          <div class="brand-copy">
+            <p class="brand-name">Auralis <span class="brand-version" data-field="brand-version"></span></p>
             <p class="brand-subtitle">Local desktop dictation</p>
           </div>
         </div>
@@ -510,6 +515,7 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
           <p class="hero__lede" data-field="mode-copy">
             Desktop Whisper records microphone audio locally, then copies or inserts the transcript after you stop.
           </p>
+          <p class="status-card__meta" data-field="support"></p>
           <div class="hero__actions">
             <button class="button button--primary button--record" data-action="start" type="button">Start recording</button>
           </div>
@@ -518,20 +524,17 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
           </p>
         </div>
 
-        <div class="recorder-panel" aria-label="Current recording status">
-          <div class="record-orb" data-field="record-orb" aria-hidden="true">
-            <span class="record-orb__core"></span>
-            <span class="record-orb__ring"></span>
+        <div class="capture-strip" data-field="capture-strip" aria-label="Current recording status">
+          <div class="capture-strip__state">
+            <p class="status-card__label">Current state</p>
+            <p class="status-card__value" data-field="status" role="status" aria-live="polite"></p>
           </div>
-          <p class="status-card__label">Current state</p>
-          <p class="status-card__value" data-field="status" role="status" aria-live="polite"></p>
-          <p class="status-card__meta" data-field="support"></p>
           <div class="mic-meter" data-field="mic-meter" aria-label="Microphone activity">
             <span class="mic-meter__bar" data-field="meter-fill"></span>
           </div>
           <p class="status-card__value status-card__value--small" data-field="interim" role="status" aria-live="polite"></p>
-          <p class="status-card__meta" data-field="flow-hint"></p>
         </div>
+        <p class="status-card__meta flow-hint" data-field="flow-hint"></p>
       </section>
 
       ${
@@ -546,7 +549,7 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
         </div>
         <ol class="setup-checklist__items" aria-label="First-run readiness steps">
           <li><strong>Private offline:</strong> install or refresh the local engine if the base model is missing.</li>
-          <li><strong>Fast cloud:</strong> choose OpenRouter STT in Engine settings when speed matters and your API key is configured in Electron main.</li>
+          <li><strong>Fast cloud:</strong> choose OpenRouter STT in Advanced settings when speed matters and your API key is configured in Electron main.</li>
           <li><strong>Mic permission appears on first recording:</strong> grant it once, then use the global shortcut.</li>
           <li><strong>Shortcut and paste test:</strong> place the cursor in another app, record, stop, and confirm copy or paste delivery.</li>
         </ol>
@@ -555,7 +558,7 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
       }
 
       <section class="workspace" data-field="workspace">
-        <article class="panel panel--large">
+        <article class="panel panel--large transcript-panel">
           <div class="panel__header">
             <div>
               <p class="eyebrow">Transcript</p>
@@ -568,26 +571,30 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
               <button class="button button--ghost" data-action="clear-current" type="button">Clear</button>
             </div>
           </div>
+          <div class="shortcut-map" data-field="shortcut-map" aria-label="Keyboard shortcuts"></div>
           <label class="sr-only" for="transcript-area">Transcript</label>
           <textarea
             id="transcript-area"
             class="transcript-area"
             data-field="transcript"
-            placeholder="Your transcript appears here after you stop a local Whisper recording. You can edit it before copying."
+            placeholder="Your transcript appears here after you stop recording. You can edit it before copying."
           ></textarea>
           <div class="editor-footer">
             <p class="flash" data-field="flash" role="status" aria-live="polite"></p>
             <p class="transcript-stats" data-field="transcript-stats"></p>
           </div>
         </article>
+      </section>
 
-        <aside class="panel settings-panel">
-          <div class="panel__header">
-            <div>
-              <p class="eyebrow">Settings</p>
-              <h2>Recognition</h2>
-            </div>
-          </div>
+      <details class="panel advanced-settings" data-field="advanced-settings">
+        <summary class="advanced-settings__summary">
+          <span>
+            <span class="eyebrow">Settings</span>
+            <span class="advanced-settings__title">Advanced settings</span>
+          </span>
+          <small>Engine, output, local history, updates, and personal text rules</small>
+        </summary>
+        <div class="advanced-settings__content">
           <details class="engine-settings" data-field="engine-settings">
             <summary>
               <span>Engine settings</span>
@@ -679,8 +686,8 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
             </div>`
               : ""
           }
-        </aside>
-      </section>
+        </div>
+      </details>
 
       <details class="panel history-panel" data-field="history-section">
         <summary class="history-summary" data-field="history-summary">
@@ -724,6 +731,7 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
   const shell = requiredQuery<HTMLElement>(root, '[data-field="shell"]');
   const workspace = requiredQuery<HTMLElement>(root, '[data-field="workspace"]');
   const statusPill = requiredQuery<HTMLElement>(root, '[data-field="status-pill"]');
+  const brandVersion = requiredQuery<HTMLElement>(root, '[data-field="brand-version"]');
   const heroTitle = requiredQuery<HTMLElement>(root, '[data-field="hero-title"]');
   const copyCurrentButton = requiredQuery<HTMLButtonElement>(root, '[data-action="copy-current"]');
   const pasteCurrentButton = requiredQuery<HTMLButtonElement>(
@@ -741,12 +749,16 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
   const interimField = requiredQuery<HTMLElement>(root, '[data-field="interim"]');
   const micMeter = requiredQuery<HTMLElement>(root, '[data-field="mic-meter"]');
   const meterFill = requiredQuery<HTMLElement>(root, '[data-field="meter-fill"]');
-  const recordOrb = requiredQuery<HTMLElement>(root, '[data-field="record-orb"]');
   const flowHint = requiredQuery<HTMLElement>(root, '[data-field="flow-hint"]');
   const transcriptStatsField = requiredQuery<HTMLElement>(root, '[data-field="transcript-stats"]');
   const desktopStatusCard = requiredQuery<HTMLElement>(root, '[data-field="desktop-status-card"]');
   const desktopStatusField = requiredQuery<HTMLElement>(root, '[data-field="desktop-status"]');
   const flashField = requiredQuery<HTMLElement>(root, '[data-field="flash"]');
+  const shortcutMap = requiredQuery<HTMLElement>(root, '[data-field="shortcut-map"]');
+  const advancedSettings = requiredQuery<HTMLDetailsElement>(
+    root,
+    '[data-field="advanced-settings"]',
+  );
   const engineSettings = requiredQuery<HTMLDetailsElement>(root, '[data-field="engine-settings"]');
   const historySection = requiredQuery<HTMLDetailsElement>(root, '[data-field="history-section"]');
   const historySummaryCopy = requiredQuery<HTMLElement>(
@@ -1276,7 +1288,11 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
     shell.dataset.status = state.status;
     statusPill.textContent = statusCopy(state.status);
     statusPill.dataset.status = state.status;
+    brandVersion.textContent = state.desktopInfo?.appVersion
+      ? `v${state.desktopInfo.appVersion}`
+      : "";
     statusField.textContent = statusCopy(state.status);
+    startButton.dataset.capture = isCaptureStartingOrActive ? "active" : "idle";
 
     if (isDesktopProvider && desktopBridge) {
       heroTitle.textContent = "Record. Transcribe. Paste.";
@@ -1303,7 +1319,6 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
 
     meterFill.style.transform = `scaleX(${Math.max(0.04, level).toFixed(3)})`;
     micMeter.hidden = !isDesktopProvider;
-    recordOrb.dataset.active = String(state.status === "recording");
 
     if (isDesktopProvider) {
       if (state.status === "recording") {
@@ -1349,11 +1364,9 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
 
     desktopStatusCard.hidden = desktopBridge === null;
     if (appUpdateCard && appUpdateMeta && installUpdateButton) {
-      const version = state.desktopInfo?.appVersion;
       appUpdateCard.hidden = desktopBridge === null;
-      appUpdateMeta.textContent = version
-        ? `Installed version v${version}. Downloads and installs the latest packaged release if available.`
-        : "Downloads and installs the latest packaged release if available.";
+      appUpdateMeta.textContent =
+        "Downloads and installs the latest packaged release if available.";
       installUpdateButton.disabled =
         state.updateInstalling || typeof desktopBridge?.installUpdate !== "function";
       installUpdateButton.textContent = state.updateInstalling ? "Updating..." : "Update now";
@@ -1369,6 +1382,27 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
       desktopStatusField.textContent = `${state.desktopInfo.shortcutLabel} • stays in your target app while recording • ${pasteShortcutHint} • ${state.desktopInfo.platform}${shortcutWarnings}`;
     } else {
       desktopStatusField.textContent = "";
+    }
+
+    shortcutMap.replaceChildren();
+    const shortcutItems: Array<[string, string]> = [
+      [
+        "Record",
+        state.desktopInfo?.shortcutLabel ?? (desktopBridge ? desktopBridge.shortcutLabel : "Enter"),
+      ],
+      ["Copy", state.desktopInfo?.copyShortcutLabel ?? "Ctrl/⌘ + Alt + C"],
+      ["Paste", state.desktopInfo?.pasteShortcutLabel ?? "Ctrl/⌘ + Alt + Enter"],
+      ["Clear", "Ctrl+Alt+Backspace"],
+      ["Settings", "Ctrl+,"],
+    ];
+    for (const [label, shortcut] of shortcutItems) {
+      const item = el("span", "shortcut-map__item");
+      const action = el("strong");
+      const key = el("kbd");
+      action.textContent = label;
+      key.textContent = shortcut;
+      item.append(action, key);
+      shortcutMap.append(item);
     }
 
     flashField.textContent = state.flash?.text ?? "";
@@ -1511,11 +1545,13 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
     let finalSessionText = "";
     let personalTextError: string | null = null;
     try {
-      finalSessionText = applyPersonalTextSettings(
-        formattedSessionText,
-        state.personalTextSettings,
-        sessionSettings.outputMode,
-      ).trim();
+      finalSessionText = ensureTrailingDictationSpace(
+        applyPersonalTextSettings(
+          formattedSessionText,
+          state.personalTextSettings,
+          sessionSettings.outputMode,
+        ),
+      );
     } catch (error) {
       personalTextError = error instanceof Error ? error.message : "Personal text rules failed.";
     }
@@ -1568,7 +1604,7 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
 
     const latestEntry = state.history[0];
     const duplicateLatestEntry =
-      latestEntry?.text.trim() === finalSessionText &&
+      latestEntry?.text.trim() === finalSessionText.trim() &&
       (latestEntry.rawText ?? latestEntry.text).trim() === finalRawSessionText &&
       (latestEntry.outputMode ?? "literal") === sessionSettings.outputMode;
     let completionTone: FlashTone = sessionError ? "error" : "success";
@@ -1593,17 +1629,16 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
     } else {
       const previousHistory = state.history;
       const previousHistoryPanelOpen = state.historyPanelOpen;
-      state.history = trimHistory([
-        buildTranscriptEntry(
-          finalSessionText,
-          sessionSettings,
-          sessionStartedAt,
-          sessionFinishedAt,
-          undefined,
-          finalRawSessionText,
-        ),
-        ...state.history,
-      ]);
+      const nextEntry = buildTranscriptEntry(
+        finalSessionText,
+        sessionSettings,
+        sessionStartedAt,
+        sessionFinishedAt,
+        undefined,
+        finalRawSessionText,
+      );
+      nextEntry.text = finalSessionText;
+      state.history = trimHistory([nextEntry, ...state.history]);
       if (persistHistory()) {
         state.historyPanelOpen = true;
         setFlash(completionTone, completionMessage);
@@ -2158,14 +2193,53 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
     void pasteCurrentTranscript(detail?.pasteTargetToken ?? null);
   };
 
+  const handleKeyboardShortcut = (event: KeyboardEvent) => {
+    const hasCommandChord = (event.ctrlKey || event.metaKey) && event.altKey;
+    if (!hasCommandChord) {
+      return;
+    }
+
+    const key = event.key.toLowerCase();
+    if (key === "c") {
+      event.preventDefault();
+      void copyCurrentTranscript();
+      return;
+    }
+
+    if (key === "enter") {
+      event.preventDefault();
+      void pasteCurrentTranscript();
+      return;
+    }
+
+    if (key === "backspace") {
+      event.preventDefault();
+      state.transcript = "";
+      state.interimText = "";
+      state.sessionTranscript = "";
+      state.awaitingClearAllConfirmation = false;
+      setFlash("info", "Current transcript cleared.");
+      render();
+      return;
+    }
+
+    if (key === ",") {
+      event.preventDefault();
+      advancedSettings.open = true;
+      advancedSettings.focus();
+    }
+  };
+
   target.addEventListener("auralis:desktop-toggle-dictation", toggleDictationFromDesktop);
   target.addEventListener("auralis:desktop-copy-transcript", handleDesktopCopyTranscript);
   target.addEventListener("auralis:desktop-paste-transcript", handleDesktopPasteTranscript);
+  target.addEventListener("keydown", handleKeyboardShortcut);
 
   const disposeMountedApp = () => {
     target.removeEventListener("auralis:desktop-toggle-dictation", toggleDictationFromDesktop);
     target.removeEventListener("auralis:desktop-copy-transcript", handleDesktopCopyTranscript);
     target.removeEventListener("auralis:desktop-paste-transcript", handleDesktopPasteTranscript);
+    target.removeEventListener("keydown", handleKeyboardShortcut);
     if (mountedAppDisposers.get(target) === disposeMountedApp) {
       mountedAppDisposers.delete(target);
     }

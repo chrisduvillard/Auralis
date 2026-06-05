@@ -1149,9 +1149,20 @@ with tempfile.TemporaryDirectory() as temp_dir:
   it("keeps the hero headline smaller and compact for a desktop utility", () => {
     const styles = readProjectFile("src/styles.css");
 
-    expect(styles).toContain("font-size: clamp(1.85rem, 4vw, 2.75rem);");
+    expect(styles).toContain("font-size: clamp(1.18rem, 2.1vw, 1.65rem);");
+    expect(styles).not.toContain("font-size: clamp(1.85rem, 4vw, 2.75rem);");
     expect(styles).not.toContain("font-size: clamp(2.15rem, 5vw, 3.4rem);");
     expect(styles).not.toContain("font-size: clamp(2.8rem, 7vw, 5rem);");
+  });
+
+  it("removes the oversized pulsing recorder orb from the desktop shell", () => {
+    const app = readProjectFile("src/app.ts");
+    const styles = readProjectFile("src/styles.css");
+
+    expect(app).not.toContain('data-field="record-orb"');
+    expect(styles).not.toContain(".record-orb");
+    expect(styles).not.toContain("pulse-recording");
+    expect(styles).toContain(".capture-strip");
   });
 
   it("pastes on Windows without restoring or resizing the target window", () => {

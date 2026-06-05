@@ -587,8 +587,64 @@ describe("Auralis app UI", () => {
     const { root } = mountApp();
 
     await vi.waitFor(() =>
-      expect(root.querySelector('[data-field="app-update-card"]')?.textContent).toContain("v0.2.0"),
+      expect(root.querySelector('[data-field="brand-version"]')?.textContent).toBe("v0.2.0"),
     );
+    expect(root.querySelector('[data-field="app-update-card"]')?.textContent).not.toContain(
+      "v0.2.0",
+    );
+  });
+
+  it("keeps dense configuration behind one advanced settings accordion", () => {
+    const { root } = mountApp({ desktop: false });
+    const advancedSettings = root.querySelector<HTMLDetailsElement>(
+      '[data-field="advanced-settings"]',
+    );
+    const engineSettings = root.querySelector<HTMLDetailsElement>('[data-field="engine-settings"]');
+    const personalTextSettings = root.querySelector<HTMLDetailsElement>(
+      '[data-field="personal-text-settings"]',
+    );
+
+    expect(advancedSettings).toBeInstanceOf(HTMLDetailsElement);
+    expect(advancedSettings?.open).toBe(false);
+    expect(advancedSettings?.querySelector('[data-field="engine-settings"]')).toBe(engineSettings);
+    expect(advancedSettings?.querySelector('[data-field="personal-text-settings"]')).toBe(
+      personalTextSettings,
+    );
+    expect(root.querySelector(".settings-panel")).toBeNull();
+    expect(root.querySelector('[data-field="record-orb"]')).toBeNull();
+    expect(root.textContent).toContain("Advanced settings");
+  });
+
+  it("surfaces keyboard shortcuts for the primary mouse-free actions", async () => {
+    Object.defineProperty(window, "auralisDesktop", {
+      configurable: true,
+      value: {
+        getInfo: async () => ({
+          copyShortcutLabel: "Ctrl+Alt+C",
+          ok: true,
+          pasteShortcutLabel: "Ctrl+Alt+Enter",
+          platform: "linux",
+          shortcutLabel: "Ctrl + Alt + Space toggles from any app",
+          shortcutWarnings: [],
+        }),
+        platform: "linux",
+        shortcutLabel: "Ctrl + Alt + Space toggles from any app",
+      },
+    });
+
+    const { root } = mountApp();
+    const shortcutMap = root.querySelector<HTMLElement>('[data-field="shortcut-map"]');
+
+    await vi.waitFor(() => expect(shortcutMap?.textContent).toContain("Ctrl + Alt + Space"));
+    expect(shortcutMap?.textContent).toContain("Record");
+    expect(shortcutMap?.textContent).toContain("Copy");
+    expect(shortcutMap?.textContent).toContain("Ctrl+Alt+C");
+    expect(shortcutMap?.textContent).toContain("Paste");
+    expect(shortcutMap?.textContent).toContain("Ctrl+Alt+Enter");
+    expect(shortcutMap?.textContent).toContain("Clear");
+    expect(shortcutMap?.textContent).toContain("Ctrl+Alt+Backspace");
+    expect(shortcutMap?.textContent).toContain("Settings");
+    expect(shortcutMap?.textContent).toContain("Ctrl+,");
   });
 
   it("disables the desktop update button while installing the latest release", async () => {
@@ -673,7 +729,7 @@ describe("Auralis app UI", () => {
     expect(root.textContent).toContain("Browser default engine");
 
     button(root, "Copy").click();
-    await vi.waitFor(() => expect(clipboardWrites).toContain("hello from the microphone"));
+    await vi.waitFor(() => expect(clipboardWrites).toContain("hello from the microphone "));
     await vi.waitFor(() =>
       expect(root.textContent).toContain("Transcript copied to the clipboard."),
     );
@@ -681,7 +737,7 @@ describe("Auralis app UI", () => {
     const historyCopyButton = root.querySelector<HTMLButtonElement>('[data-entry-action="copy"]');
     historyCopyButton?.click();
     await vi.waitFor(() => expect(clipboardWrites).toHaveLength(2));
-    expect(clipboardWrites[1]).toBe("hello from the microphone");
+    expect(clipboardWrites[1]).toBe("hello from the microphone ");
     await vi.waitFor(() =>
       expect(root.textContent).toContain("Saved transcript copied to the clipboard."),
     );
@@ -693,7 +749,7 @@ describe("Auralis app UI", () => {
     transcript.value = "temporary editor text";
     transcript.dispatchEvent(new Event("input", { bubbles: true }));
     root.querySelector<HTMLButtonElement>('[data-entry-action="use"]')?.click();
-    expect(transcript.value).toBe("hello from the microphone");
+    expect(transcript.value).toBe("hello from the microphone ");
     expect(root.textContent).toContain("Saved transcript loaded into the editor.");
 
     root.querySelector<HTMLButtonElement>('[data-entry-action="delete"]')?.click();
@@ -718,6 +774,25 @@ describe("Auralis app UI", () => {
     expect(remounted.textContent).toContain("Browser Web Speech API");
   });
 
+  it("appends a trailing dictation space to finalized transcripts, copies, and history", async () => {
+    enableTranscriptHistory();
+    const { root, clipboardWrites } = mountApp();
+
+    button(root, "Start listening").click();
+    FakeRecognition.latest?.emitFinal("continue this sentence");
+    button(root, "Stop").click();
+
+    expect(root.querySelector<HTMLTextAreaElement>("#transcript-area")?.value).toBe(
+      "continue this sentence ",
+    );
+    expect(JSON.parse(localStorage.getItem("auralis:history:v1") ?? "[]")[0]?.text).toBe(
+      "continue this sentence ",
+    );
+
+    button(root, "Copy").click();
+    await vi.waitFor(() => expect(clipboardWrites).toContain("continue this sentence "));
+  });
+
   it("captures speech without saving history when local archive is disabled", async () => {
     enableTranscriptHistory();
     const { root, clipboardWrites } = mountApp();
@@ -740,14 +815,14 @@ describe("Auralis app UI", () => {
     button(root, "Stop").click();
 
     expect(root.querySelector<HTMLTextAreaElement>("#transcript-area")?.value).toBe(
-      "private unsaved dictation",
+      "private unsaved dictation ",
     );
     expect(root.textContent).toContain("Transcript ready. History saving is off.");
     expect(root.textContent).toContain("0 saved transcripts");
     expect(localStorage.getItem("auralis:history:v1")).toBeNull();
 
     button(root, "Copy").click();
-    await vi.waitFor(() => expect(clipboardWrites).toContain("private unsaved dictation"));
+    await vi.waitFor(() => expect(clipboardWrites).toContain("private unsaved dictation "));
   });
 
   it("keeps oversized desktop transcripts editor-only when local archive is disabled", async () => {
@@ -787,13 +862,13 @@ describe("Auralis app UI", () => {
 
     await vi.waitFor(() =>
       expect(root.querySelector<HTMLTextAreaElement>("#transcript-area")?.value).toBe(
-        longTranscript,
+        `${longTranscript} `,
       ),
     );
     expect(root.textContent).toContain("Transcript ready. History saving is off.");
     expect(root.textContent).not.toContain("Transcript is too long to save locally");
     expect(localStorage.getItem("auralis:history:v1")).toBeNull();
-    expect(copyText).toHaveBeenCalledWith(longTranscript);
+    expect(copyText).toHaveBeenCalledWith(`${longTranscript} `);
   });
 
   it("surfaces desktop app mode and responds to desktop shortcut events", async () => {
@@ -834,7 +909,7 @@ describe("Auralis app UI", () => {
     expect(root.textContent).toContain("Transcript saved locally.");
 
     window.dispatchEvent(new CustomEvent("auralis:desktop-copy-transcript"));
-    await vi.waitFor(() => expect(clipboardWrites).toContain("desktop shortcut text"));
+    await vi.waitFor(() => expect(clipboardWrites).toContain("desktop shortcut text "));
   });
 
   it("uses the fallback toggle label in shortcut-start notifications when hold-to-talk is primary", async () => {
@@ -892,7 +967,7 @@ describe("Auralis app UI", () => {
     window.dispatchEvent(new CustomEvent("auralis:desktop-toggle-dictation"));
 
     await vi.waitFor(() =>
-      expect(copyText).toHaveBeenCalledWith("copy only without a fresh target"),
+      expect(copyText).toHaveBeenCalledWith("copy only without a fresh target "),
     );
     expect(pasteText).not.toHaveBeenCalled();
     await vi.waitFor(() =>
@@ -947,7 +1022,7 @@ describe("Auralis app UI", () => {
       }),
     );
 
-    await vi.waitFor(() => expect(pasteText).toHaveBeenCalledWith("send this to the focused app"));
+    await vi.waitFor(() => expect(pasteText).toHaveBeenCalledWith("send this to the focused app "));
     await vi.waitFor(() =>
       expect(captureStates.at(-1)).toEqual(
         expect.objectContaining({ muteSystemAudio: false, status: "idle" }),
@@ -957,10 +1032,10 @@ describe("Auralis app UI", () => {
       expect(root.textContent).toContain("Inserted: send this to the focused app"),
     );
     await vi.waitFor(() =>
-      expect(notify).toHaveBeenCalledWith("Inserted: send this to the focused app"),
+      expect(notify).toHaveBeenCalledWith("Inserted: send this to the focused app "),
     );
     expect(JSON.parse(localStorage.getItem("auralis:history:v1") ?? "[]")[0]?.text).toBe(
-      "send this to the focused app",
+      "send this to the focused app ",
     );
   });
 
@@ -995,7 +1070,9 @@ describe("Auralis app UI", () => {
       new CustomEvent("auralis:desktop-toggle-dictation", { detail: { autoPaste: true } }),
     );
 
-    await vi.waitFor(() => expect(pasteText).toHaveBeenCalledWith("local whisper text for cursor"));
+    await vi.waitFor(() =>
+      expect(pasteText).toHaveBeenCalledWith("local whisper text for cursor "),
+    );
     expect(root.textContent).toContain("Inserted locally: local whisper text for cursor");
   });
 
@@ -1051,7 +1128,7 @@ describe("Auralis app UI", () => {
       }),
     );
 
-    await vi.waitFor(() => expect(pasteText).toHaveBeenCalledWith("one held session"));
+    await vi.waitFor(() => expect(pasteText).toHaveBeenCalledWith("one held session "));
     expect(transcribeAudio).toHaveBeenCalledTimes(1);
   });
 
@@ -1192,7 +1269,7 @@ describe("Auralis app UI", () => {
     button(root, "Stop & transcribe").click();
 
     await vi.waitFor(() =>
-      expect(copyText).toHaveBeenCalledWith("copy only from in-app recording"),
+      expect(copyText).toHaveBeenCalledWith("copy only from in-app recording "),
     );
     expect(pasteText).not.toHaveBeenCalled();
     await vi.waitFor(() =>
@@ -1546,7 +1623,7 @@ describe("Auralis app UI", () => {
     });
     expect(stoppedTracks).toContain("audio");
     expect(root.querySelector<HTMLTextAreaElement>("#transcript-area")?.value).toBe(
-      "local whisper transcript",
+      "local whisper transcript ",
     );
     const persisted = JSON.parse(
       localStorage.getItem("auralis:history:v1") ?? "[]",
@@ -1554,7 +1631,7 @@ describe("Auralis app UI", () => {
     expect(persisted[0]).toMatchObject({
       modelId: "desktop-whisper-base",
       providerId: "desktop-whisper",
-      text: "local whisper transcript",
+      text: "local whisper transcript ",
     });
   });
 
@@ -1711,7 +1788,7 @@ describe("Auralis app UI", () => {
     expect(transcribeRequests[0]?.audioData.byteLength).toBeGreaterThan(0);
     expect(stoppedTracks).toContain("audio");
     expect(root.querySelector<HTMLTextAreaElement>("#transcript-area")?.value).toBe(
-      "first word preserved",
+      "first word preserved ",
     );
   });
 
@@ -1775,7 +1852,7 @@ describe("Auralis app UI", () => {
 
     await vi.waitFor(() => expect(transcribeRequests).toHaveLength(1));
     expect(root.querySelector<HTMLTextAreaElement>("#transcript-area")?.value).toBe(
-      "recorder startup gap preserved",
+      "recorder startup gap preserved ",
     );
   });
 
@@ -1830,7 +1907,7 @@ describe("Auralis app UI", () => {
     await vi.waitFor(() => expect(pasteRequests).toHaveLength(1));
     expect(pasteRequests[0]).toEqual({
       pasteTargetToken: "fresh-target-token",
-      text: "shortcut transcript",
+      text: "shortcut transcript ",
     });
   });
 
@@ -1932,7 +2009,7 @@ describe("Auralis app UI", () => {
       outputMode: "cleaned",
       providerId: "openrouter-stt",
       rawText: "um fast openrouter transcript comma please",
-      text: "Fast openrouter transcript, please.",
+      text: "Fast openrouter transcript, please. ",
     });
   });
 
@@ -1997,7 +2074,7 @@ describe("Auralis app UI", () => {
       language: "en-US",
       modelId: "desktop-whisper-base",
       providerId: "desktop-whisper",
-      text: "stable session metadata",
+      text: "stable session metadata ",
     });
     expect(model.disabled).toBe(false);
     expect(language.disabled).toBe(false);
@@ -2058,9 +2135,9 @@ describe("Auralis app UI", () => {
     const persisted = JSON.parse(
       localStorage.getItem("auralis:history:v1") ?? "[]",
     ) as TranscriptEntry[];
-    expect(persisted[0]?.text).toBe("resolved after repeated stop");
+    expect(persisted[0]?.text).toBe("resolved after repeated stop ");
     expect(root.querySelector<HTMLTextAreaElement>("#transcript-area")?.value).toBe(
-      "resolved after repeated stop",
+      "resolved after repeated stop ",
     );
   });
 
@@ -2110,7 +2187,7 @@ describe("Auralis app UI", () => {
     await vi.waitFor(() => expect(root.textContent).toContain("Transcript saved locally."));
     expect(transcribeRequests[0]?.audioData.byteLength).toBeGreaterThan(0);
     expect(root.querySelector<HTMLTextAreaElement>("#transcript-area")?.value).toBe(
-      "early stop transcript",
+      "early stop transcript ",
     );
   });
 
@@ -2266,7 +2343,7 @@ describe("Auralis app UI", () => {
       text: string;
     }>;
 
-    expect(persisted.filter((entry) => entry.text === "repeatable phrase")).toHaveLength(1);
+    expect(persisted.filter((entry) => entry.text === "repeatable phrase ")).toHaveLength(1);
   });
 
   it("keeps distinct raw transcripts when cleanup produces the same output", () => {
@@ -2295,7 +2372,7 @@ describe("Auralis app UI", () => {
       "uh ship the patch comma please",
       "um ship the patch comma please",
     ]);
-    expect(persisted.every((entry) => entry.text === "Ship the patch, please.")).toBe(true);
+    expect(persisted.every((entry) => entry.text === "Ship the patch, please. ")).toBe(true);
   });
 
   it("applies personal text rules after output cleanup while preserving raw transcript text", () => {
@@ -2333,11 +2410,11 @@ describe("Auralis app UI", () => {
       localStorage.getItem("auralis:history:v1") ?? "[]",
     ) as TranscriptEntry[];
 
-    expect(transcript?.value).toBe("OpenRouter, please.");
+    expect(transcript?.value).toBe("OpenRouter, please. ");
     expect(persisted[0]).toMatchObject({
       outputMode: "cleaned",
       rawText: "um open router comma please",
-      text: "OpenRouter, please.",
+      text: "OpenRouter, please. ",
     });
   });
 
@@ -2770,7 +2847,9 @@ describe("Auralis app UI", () => {
     button(root, "Stop").click();
 
     expect(localStorage.getItem("auralis:history:v1")).toBeNull();
-    expect(root.querySelector<HTMLTextAreaElement>("#transcript-area")?.value).toBe(longTranscript);
+    expect(root.querySelector<HTMLTextAreaElement>("#transcript-area")?.value).toBe(
+      `${longTranscript} `,
+    );
     expect(root.textContent).toContain("Transcript is too long to save locally");
   });
 
@@ -2832,7 +2911,7 @@ describe("Auralis app UI", () => {
     const persisted = JSON.parse(
       localStorage.getItem("auralis:history:v1") ?? "[]",
     ) as TranscriptEntry[];
-    expect(persisted[0]?.text).toBe("partial dictation before network loss");
+    expect(persisted[0]?.text).toBe("partial dictation before network loss ");
     expect(root.textContent).toContain("Saved partial transcript after an error");
     expect(root.textContent).toContain("network problem");
   });
