@@ -50,7 +50,7 @@ def elapsed_ms(start: float) -> int:
 
 
 def add_uv_cache_archives() -> None:
-    if os.environ.get("AURALIS_WHISPER_USE_UV_CACHE", "1") == "0":
+    if os.environ.get("AURALIS_WHISPER_USE_UV_CACHE", "0") != "1":
         return
 
     archive_root = Path.home() / ".cache" / "uv" / "archive-v0"

@@ -7,13 +7,14 @@
     "build",
     "dist",
     "electron",
-    "scripts",
+    "scripts/bootstrap-local-whisper.py",
+    "scripts/transcribe-local-whisper.py",
     "package.json"
   ],
   "packageManager": "npm@10.9.2",
   "main": "electron/main.cjs",
   "engines": {
-    "node": ">=22.12.0",
+    "node": ">=22.12 <23",
     "npm": ">=10"
   },
   "scripts": {
@@ -61,7 +62,8 @@
       "build/icon.*",
       "dist/**/*",
       "electron/**/*",
-      "scripts/**/*",
+      "scripts/bootstrap-local-whisper.py",
+      "scripts/transcribe-local-whisper.py",
       "package.json"
     ],
     "asar": true,

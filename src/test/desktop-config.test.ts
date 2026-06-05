@@ -38,7 +38,9 @@ describe("desktop app packaging config", () => {
 
     expect(packageJson.version).toBe("0.1.2");
     expect(packageJson.main).toBe("electron/main.cjs");
-    expect(packageJson.engines?.node).toBe(">=22.12.0");
+    expect(packageJson.engines?.node).toBe(">=22.12 <23");
+    expect(readProjectFile(".nvmrc").trim()).toBe("22");
+    expect(readProjectFile(".node-version").trim()).toBe("22");
     expect(packageJson.engines?.npm).toBe(">=10");
     expect(packageJson.scripts?.desktop).toBe("npm run build && node scripts/run-electron.cjs .");
     expect(packageJson.scripts?.["desktop:dev"]).toBe("vite --host 127.0.0.1");
@@ -194,7 +196,7 @@ describe("desktop app packaging config", () => {
     expect(workflow).toContain("make_latest: true");
     expect(workflow).not.toContain("make_latest: false");
     expect(workflow).toContain(
-      "This release is created for a successful, non-canceled public main push",
+      "This signed release is created for a successful, non-canceled public main push",
     );
     expect(workflow).not.toContain("This release is created on every push to `main`");
     expect(workflow).toContain("group: windows-installer-update-channel");
@@ -624,10 +626,10 @@ describe("desktop app packaging config", () => {
     expect(preload).not.toContain("keydown");
     expect(preload).not.toContain("keyup");
     expect(readme).toContain(
-      "Hold `Ctrl + Win`: record while held, then transcribe and insert on release.",
+      "| Hold `Ctrl + Win` | Record while held, then transcribe and insert on release |",
     );
     expect(readme).toContain(
-      "`Ctrl + Alt + Space`: fallback toggle if hold-to-talk is unavailable.",
+      "| `Ctrl + Alt + Space` | Fallback toggle if hold-to-talk is unavailable |",
     );
   });
 
@@ -732,20 +734,15 @@ describe("desktop app packaging config", () => {
     const readme = readProjectFile("README.md");
 
     expect(readme).toContain("## Quick start");
-    expect(readme).toContain("## Daily workflow");
-    expect(readme).toContain("## Platform behavior");
-    expect(readme).toContain("<summary>Advanced setup and troubleshooting</summary>");
+    expect(readme).toContain("## Daily use");
+    expect(readme).toContain("## Platform notes");
+    expect(readme).toContain("## Advanced notes");
     expect(readme).toContain(
-      "Use Desktop local Whisper for the most reliable offline workflow, or OpenRouter STT when speed matters",
+      "It can transcribe locally with Whisper, or optionally use OpenRouter when cloud transcription speed matters.",
     );
-    expect(readme).toContain("First-run readiness");
-    expect(readme).toContain(
-      "Auralis defaults first-run desktop installs to `Local Whisper base (recommended)`",
-    );
-    expect(readme).toContain(
-      "OpenRouter STT models remain selectable for users who prefer cloud transcription speed",
-    );
-    expect(readme).toContain("### STT proof matrix");
+    expect(readme).toContain("## First run");
+    expect(readme).toContain("Auralis defaults fresh desktop profiles to:");
+    expect(readme).toContain("Model: **Local Whisper base (recommended)**");
     expect(readme).toContain("npm run stt:proof -- --dry-run --format markdown");
     expect(readme).toContain(
       "OpenRouter calls are skipped unless both `OPENROUTER_API_KEY` and `--allow-network` are present",
@@ -753,29 +750,21 @@ describe("desktop app packaging config", () => {
     expect(readme).toContain(
       "In-app button start copies only; global-shortcut start can auto-paste.",
     );
-    expect(readme).toContain("Hold `Ctrl + Win`: record while held");
+    expect(readme).toContain("Hold `Ctrl + Win` | Record while held");
     expect(readme).toContain(
-      "`Ctrl + Alt + Space`: fallback toggle if hold-to-talk is unavailable.",
+      "| `Ctrl + Alt + Space` | Fallback toggle if hold-to-talk is unavailable |",
     );
     expect(readme).toContain("OPENROUTER_API_KEY");
-    expect(readme).toContain("never goes into renderer storage or localStorage");
-    expect(readme).toContain(
-      "Leave local history saving off when transcripts should remain editor-only.",
-    );
-    expect(readme).toContain("Do not use it as the normal launch path.");
+    expect(readme).toContain("The key is read by Electron main.");
+    expect(readme).toContain("Local transcript history is opt-in");
+    expect(readme).toContain("Do not use `AURALIS_ALLOW_NO_SANDBOX=1` as the normal launch path.");
   });
 
   it("documents the higher-accuracy local Whisper small and medium options", () => {
     const readme = readProjectFile("README.md");
 
-    expect(readme).toContain("Model mode: `Local Whisper small (better accuracy)`");
-    expect(readme).toContain("Model mode: `Local Whisper medium (highest accuracy, ~1.5 GB)`");
-    expect(readme).toContain(
-      "Use `Local Whisper small (better accuracy)` when base is not accurate enough",
-    );
-    expect(readme).toContain(
-      "Use `Local Whisper medium (highest accuracy, ~1.5 GB)` only when accuracy matters more than download size and CPU time",
-    );
+    expect(readme).toContain("`Local Whisper small (better accuracy)`");
+    expect(readme).toContain("`Local Whisper medium (highest accuracy, ~1.5 GB)`");
   });
 
   it("maps undecodable local Whisper recordings to a user-facing no-audio message", () => {
@@ -1073,7 +1062,14 @@ with tempfile.TemporaryDirectory() as temp_dir:
     const readme = readProjectFile("README.md");
 
     expect(packageJson.license).toBe("MIT");
-    expect(packageJson.files).toEqual(["build", "dist", "electron", "scripts", "package.json"]);
+    expect(packageJson.files).toEqual([
+      "build",
+      "dist",
+      "electron",
+      "scripts/bootstrap-local-whisper.py",
+      "scripts/transcribe-local-whisper.py",
+      "package.json",
+    ]);
     expect(readProjectFile("LICENSE")).toContain("MIT License");
     expect(readProjectFile("SECURITY.md")).toContain(
       "Please do not publish vulnerabilities publicly",
@@ -1088,9 +1084,21 @@ with tempfile.TemporaryDirectory() as temp_dir:
 
   it("keeps CI least-privilege for public repository checks", () => {
     const workflow = readProjectFile(".github/workflows/ci.yml");
+    const windowsWorkflow = readProjectFile(".github/workflows/windows-installer.yml");
+    const allWorkflowText = `${workflow}\n${windowsWorkflow}`;
 
     expect(workflow).toContain("permissions:\n  contents: read");
     expect(workflow).toContain("persist-credentials: false");
+    expect(allWorkflowText).toContain(
+      "actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5",
+    );
+    expect(allWorkflowText).toContain(
+      "actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5",
+    );
+    expect(allWorkflowText).not.toMatch(/uses:\s+[^@\s]+\/[^@\s]+@v\d+/);
+    expect(readProjectFile("SECURITY.md")).toContain(
+      "GitHub Actions are pinned to full commit SHAs",
+    );
   });
 
   it("uses generic public-safe local paths in tests and docs", () => {
@@ -1168,20 +1176,28 @@ with tempfile.TemporaryDirectory() as temp_dir:
     expect(workflow).toContain("release-windows-installer");
     expect(workflow).toContain("needs: build-windows-installer");
     expect(workflow).toContain("permissions:\n      contents: write");
-    expect(workflow).toContain("actions/upload-artifact@v5");
-    expect(workflow).not.toContain("actions/upload-artifact@v4");
-    expect(workflow).toContain("actions/download-artifact@v5");
-    expect(workflow).not.toContain("actions/download-artifact@v4");
-    expect(workflow).toContain("softprops/action-gh-release@v2");
+    expect(workflow).toContain(
+      "actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5",
+    );
+    expect(workflow).toContain(
+      "actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5",
+    );
+    expect(workflow).toContain(
+      "softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2",
+    );
+    expect(workflow).not.toMatch(/uses:\s+[^@\s]+\/[^@\s]+@v\d+/);
     expect(workflow).toContain("startsWith(github.ref, 'refs/tags/v')");
     expect(workflow).toContain("Resolve updater release version");
     expect(workflow).toContain('$env:GITHUB_REF_NAME -ne "v$packageVersion"');
     expect(workflow).toContain(
       "Signing certificate is required for public Windows release publication.",
     );
+    expect(workflow).toContain("publishesPublicRelease");
+    expect(workflow).toContain("building unsigned non-release artifact");
     expect(workflow).not.toContain(
       "No Windows signing certificate configured; building unsigned installer.",
     );
+    expect(workflow).not.toContain("building unsigned main-push updater artifact");
     expect(workflow).toContain("github.repository == 'chrisduvillard/Auralis'");
     expect(workflow).toContain("github.ref == 'refs/heads/main'");
     expect(workflow).not.toContain(["auralis-main-", "{{ github.run_number }}"].join("$"));
@@ -1230,7 +1246,7 @@ with tempfile.TemporaryDirectory() as temp_dir:
   it("documents local Windows installer cache recovery", () => {
     const readme = readProjectFile("README.md");
 
-    expect(readme).toContain("Node.js `>=22.12.0`");
+    expect(readme).toContain("Node.js `22.x` (`>=22.12 <23`)");
     expect(readme).toContain("npm `overrides`");
     expect(readme).toContain("vendor/rimraf-compat");
     expect(readme).toContain("callback-style cleanup");
@@ -1238,7 +1254,7 @@ with tempfile.TemporaryDirectory() as temp_dir:
 
     expect(readme).toContain("`toolsets.winCodeSign` is pinned to `1.1.0`");
     expect(readme).toContain("Cannot create symbolic link");
-    expect(readme).toContain("certificate auto-discovery is disabled by the package script");
+    expect(readme).toContain("package scripts disable certificate auto-discovery");
     expect(readme).toContain("signAndEditExecutable=false");
     expect(readme).toContain("AURALIS_WINDOWS_SIGNING=1");
     expect(readme).toContain('rmdir /s /q "%LOCALAPPDATA%\\electron-builder\\Cache\\winCodeSign"');
@@ -1248,15 +1264,17 @@ with tempfile.TemporaryDirectory() as temp_dir:
     const readme = readProjectFile("README.md");
 
     expect(readme).toContain("Update now");
-    expect(readme).toContain("downloads and installs the latest published GitHub Release");
+    expect(readme).toContain(
+      "downloads and installs the latest updater-compatible Windows release",
+    );
     expect(readme).toContain("GitHub Release metadata files such as `latest.yml`");
     expect(readme).toContain(
-      "successful, non-canceled `main` push workflow run creates an updater-visible GitHub Release",
+      "publishes updater-visible releases from successful, non-canceled public `main` pushes",
     );
-    expect(readme).toContain("tag releases still require Windows signing certificate secrets");
     expect(readme).toContain(
-      "Enforce protected or signed release tags with GitHub repository rulesets",
+      "Public updater-visible releases require Windows signing certificate secrets",
     );
+    expect(readme).toContain("Private GitHub repositories are not a public update channel");
     expect(readme).not.toContain("Pushing a signed `v*` tag publishes");
     expect(readme).not.toContain("Only signed `v*` tags publish assets");
     expect(readme).not.toContain("Every push to `main` creates an updater-visible GitHub Release");
@@ -1270,7 +1288,7 @@ with tempfile.TemporaryDirectory() as temp_dir:
       "On Linux, `npm run desktop` may first require Electron sandbox setup.",
     );
     expect(readme).toContain(
-      "For successful, non-canceled public `main` push workflow runs and for `v*` tag releases with Windows signing secrets configured, the current Windows workflow publishes the NSIS installer, `Auralis-Setup-*.exe.blockmap`, and `latest*.yml` metadata so the in-app updater can discover and install releases.",
+      "The Windows installer workflow publishes updater-visible releases from successful, non-canceled public `main` pushes in `chrisduvillard/Auralis`, and from intentional `v*` tag releases.",
     );
     expect(readme).toContain(
       "The Windows workflow verifies silent install and installed-app launch, then attempts the uninstaller when it is present.",
@@ -1279,11 +1297,36 @@ with tempfile.TemporaryDirectory() as temp_dir:
 
   it("documents local Whisper performance tuning controls", () => {
     const readme = readProjectFile("README.md");
+    const mainProcess = readProjectFile("electron/main.cjs");
+    const helper = readProjectFile("scripts/transcribe-local-whisper.py");
 
     expect(readme).toContain("persistent local Whisper worker");
     expect(readme).toContain("AURALIS_WHISPER_DEVICE");
     expect(readme).toContain("AURALIS_WHISPER_CPU_THREADS");
     expect(readme).toContain("AURALIS_WHISPER_DISABLE_WORKER");
+    expect(readme).toContain("AURALIS_WHISPER_USE_UV_CACHE=1");
+    expect(mainProcess).toContain(
+      'AURALIS_WHISPER_USE_UV_CACHE: process.env.AURALIS_WHISPER_USE_UV_CACHE || "0"',
+    );
+    expect(helper).toContain('os.environ.get("AURALIS_WHISPER_USE_UV_CACHE", "0") != "1"');
+  });
+
+  it("keeps SECURITY release-integrity claims aligned with signed public updater releases", () => {
+    const security = readProjectFile("SECURITY.md");
+    const workflow = readProjectFile(".github/workflows/windows-installer.yml");
+
+    expect(workflow).toContain("publishesPublicRelease");
+    expect(workflow).toContain("WINDOWS_CERTIFICATE_P12");
+    expect(workflow).toContain("WINDOWS_CERTIFICATE_PASSWORD");
+    expect(workflow).toContain("github.ref == 'refs/heads/main'");
+    expect(workflow).toContain("startsWith(github.ref, 'refs/tags/v')");
+    expect(security).toContain(
+      "Both public main-push releases and intentional `v*` tag releases fail closed",
+    );
+    expect(security).toContain(
+      "Unsigned local Windows installer builds are for development and smoke testing",
+    );
+    expect(security).not.toContain("published from `v*` tags only");
   });
 
   it("declares a restrictive renderer content security policy", () => {
@@ -1293,6 +1336,11 @@ with tempfile.TemporaryDirectory() as temp_dir:
     expect(html).toContain("default-src 'self'");
     expect(html).toContain("object-src 'none'");
     expect(html).toContain("script-src 'self'");
+    expect(html).toContain("connect-src 'self'");
+    expect(html).not.toContain("http://127.0.0.1:*");
+    expect(html).not.toContain("http://localhost:*");
+    expect(html).not.toContain("ws://127.0.0.1:*");
+    expect(html).not.toContain("ws://localhost:*");
     expect(html).not.toContain("unsafe-eval");
   });
 

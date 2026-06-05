@@ -28,12 +28,12 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: "22"
           cache: npm
@@ -85,10 +85,11 @@ jobs:
         run: |
           if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_P12) -or [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)) {
             "CSC_IDENTITY_AUTO_DISCOVERY=false" | Out-File -FilePath $env:GITHUB_ENV -Append
-            if ("${{ startsWith(github.ref, 'refs/tags/v') }}" -eq "true") {
-              throw "Signing certificate is required for public Windows release publication. Configure WINDOWS_CERTIFICATE_P12 and WINDOWS_CERTIFICATE_PASSWORD before pushing v* release tags."
+            $publishesPublicRelease = "${{ startsWith(github.ref, 'refs/tags/v') || (github.repository == 'chrisduvillard/Auralis' && github.event_name == 'push' && github.ref == 'refs/heads/main') }}" -eq "true"
+            if ($publishesPublicRelease) {
+              throw "Signing certificate is required for public Windows release publication. Configure WINDOWS_CERTIFICATE_P12 and WINDOWS_CERTIFICATE_PASSWORD before publishing updater-visible releases."
             }
-            Write-Host "Windows signing certificate not configured; building unsigned main-push updater artifact."
+            Write-Host "Windows signing certificate not configured; building unsigned non-release artifact."
             exit 0
           }
 
@@ -162,7 +163,7 @@ jobs:
         run: ./scripts/smoke-windows-autopaste.ps1
 
       - name: Upload installer artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: Auralis-Windows-Installer
           path: |
@@ -181,19 +182,19 @@ jobs:
 
     steps:
       - name: Download installer artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
         with:
           name: Auralis-Windows-Installer
           path: release
 
       - name: Upload updater-visible installer to GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ needs.build-windows-installer.outputs.release-tag }}
           target_commitish: ${{ github.sha }}
           make_latest: true
           body: |
-            This release is created for a successful, non-canceled public main push or an intentional `v*` tag.
+            This signed release is created for a successful, non-canceled public main push or an intentional `v*` tag.
 
             It contains the Windows NSIS installer, blockmap, and `latest.yml` metadata required by the installed Auralis app's Update now button.
           files: |

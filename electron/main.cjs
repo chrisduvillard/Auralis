@@ -773,7 +773,7 @@ function whisperEnv({ offline = true } = {}) {
     ...process.env,
     AURALIS_WHISPER_MODEL_DIR: process.env.AURALIS_WHISPER_MODEL_DIR || whisperModelDir(),
     AURALIS_WHISPER_RUNTIME_DIR: whisperRuntimeDir(),
-    AURALIS_WHISPER_USE_UV_CACHE: process.env.AURALIS_WHISPER_USE_UV_CACHE || "1",
+    AURALIS_WHISPER_USE_UV_CACHE: process.env.AURALIS_WHISPER_USE_UV_CACHE || "0",
   };
 
   if (offline) {
