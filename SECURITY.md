@@ -36,8 +36,8 @@ Important expectations:
 
 GitHub Actions are pinned to full commit SHAs, with the upstream tag noted in comments.
 
-Updater-visible Windows releases can be published by the current workflow from successful, non-canceled pushes to `main` in the public `chrisduvillard/Auralis` repository, or from intentional `v*` tag pushes.
+Updater-visible Windows releases can be published by the current workflow from successful, non-canceled pushes to `main` in the public `chrisduvillard/Auralis` repository, or from intentional `v*` tag pushes, only when Windows signing certificate secrets are configured.
 
-Both public main-push releases and intentional `v*` tag releases fail closed unless `WINDOWS_CERTIFICATE_P12` and `WINDOWS_CERTIFICATE_PASSWORD` are configured. Unsigned local Windows installer builds are for development and smoke testing, not broad public distribution.
+Both public main-push releases and intentional `v*` tag releases fail closed by skipping updater-visible publication unless `WINDOWS_CERTIFICATE_P12` and `WINDOWS_CERTIFICATE_PASSWORD` are configured. Unsigned local and CI Windows installer builds are for development and smoke testing, not broad public distribution.
 
 Enforce branch protection, protected or signed release tags, and repository rulesets before relying on the GitHub Releases feed for public updates.

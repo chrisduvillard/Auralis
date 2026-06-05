@@ -1190,10 +1190,15 @@ with tempfile.TemporaryDirectory() as temp_dir:
     expect(workflow).toContain("Resolve updater release version");
     expect(workflow).toContain('$env:GITHUB_REF_NAME -ne "v$packageVersion"');
     expect(workflow).toContain(
+      ["publish-release: ", "{{ steps.signing.outputs.publish-release }}"].join("$"),
+    );
+    expect(workflow).toContain('"publish-release=false"');
+    expect(workflow).toContain('"publish-release=true"');
+    expect(workflow).toContain("skipping updater-visible release publication");
+    expect(workflow).toContain("needs.build-windows-installer.outputs.publish-release == 'true'");
+    expect(workflow).not.toContain(
       "Signing certificate is required for public Windows release publication.",
     );
-    expect(workflow).toContain("publishesPublicRelease");
-    expect(workflow).toContain("building unsigned non-release artifact");
     expect(workflow).not.toContain(
       "No Windows signing certificate configured; building unsigned installer.",
     );
@@ -1271,9 +1276,8 @@ with tempfile.TemporaryDirectory() as temp_dir:
     expect(readme).toContain(
       "publishes updater-visible releases from successful, non-canceled public `main` pushes",
     );
-    expect(readme).toContain(
-      "Public updater-visible releases require Windows signing certificate secrets",
-    );
+    expect(readme).toContain("When Windows signing certificate secrets are configured");
+    expect(readme).toContain("skips updater-visible release publication");
     expect(readme).toContain("Private GitHub repositories are not a public update channel");
     expect(readme).not.toContain("Pushing a signed `v*` tag publishes");
     expect(readme).not.toContain("Only signed `v*` tags publish assets");
@@ -1288,7 +1292,7 @@ with tempfile.TemporaryDirectory() as temp_dir:
       "On Linux, `npm run desktop` may first require Electron sandbox setup.",
     );
     expect(readme).toContain(
-      "The Windows installer workflow publishes updater-visible releases from successful, non-canceled public `main` pushes in `chrisduvillard/Auralis`, and from intentional `v*` tag releases.",
+      "When Windows signing certificate secrets are configured, the Windows installer workflow publishes updater-visible releases from successful, non-canceled public `main` pushes in `chrisduvillard/Auralis`, and from intentional `v*` tag releases.",
     );
     expect(readme).toContain(
       "The Windows workflow verifies silent install and installed-app launch, then attempts the uninstaller when it is present.",
@@ -1315,16 +1319,16 @@ with tempfile.TemporaryDirectory() as temp_dir:
     const security = readProjectFile("SECURITY.md");
     const workflow = readProjectFile(".github/workflows/windows-installer.yml");
 
-    expect(workflow).toContain("publishesPublicRelease");
+    expect(workflow).toContain("publish-release");
     expect(workflow).toContain("WINDOWS_CERTIFICATE_P12");
     expect(workflow).toContain("WINDOWS_CERTIFICATE_PASSWORD");
     expect(workflow).toContain("github.ref == 'refs/heads/main'");
     expect(workflow).toContain("startsWith(github.ref, 'refs/tags/v')");
     expect(security).toContain(
-      "Both public main-push releases and intentional `v*` tag releases fail closed",
+      "Both public main-push releases and intentional `v*` tag releases fail closed by skipping updater-visible publication",
     );
     expect(security).toContain(
-      "Unsigned local Windows installer builds are for development and smoke testing",
+      "Unsigned local and CI Windows installer builds are for development and smoke testing",
     );
     expect(security).not.toContain("published from `v*` tags only");
   });

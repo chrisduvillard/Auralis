@@ -153,9 +153,9 @@ release/Auralis-Setup-*.exe
 
 In the installed Windows app, **Update now** checks GitHub Releases for `chrisduvillard/Auralis`, then downloads and installs the latest updater-compatible Windows release when available.
 
-The Windows installer workflow publishes updater-visible releases from successful, non-canceled public `main` pushes in `chrisduvillard/Auralis`, and from intentional `v*` tag releases. It publishes the signed NSIS installer, `Auralis-Setup-*.exe.blockmap`, and GitHub Release metadata files such as `latest.yml`.
+When Windows signing certificate secrets are configured, the Windows installer workflow publishes updater-visible releases from successful, non-canceled public `main` pushes in `chrisduvillard/Auralis`, and from intentional `v*` tag releases. It publishes the signed NSIS installer, `Auralis-Setup-*.exe.blockmap`, and GitHub Release metadata files such as `latest.yml`.
 
-Public updater-visible releases require Windows signing certificate secrets. Local Windows installer builds remain unsigned unless signing is explicitly enabled.
+Without signing certificate secrets, the workflow builds an unsigned artifact and skips updater-visible release publication. Local Windows installer builds remain unsigned unless signing is explicitly enabled.
 
 Private GitHub repositories are not a public update channel. Do not ship a GitHub token inside the app.
 
