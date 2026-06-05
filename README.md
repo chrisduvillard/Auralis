@@ -6,8 +6,8 @@
     Press a global shortcut, speak, stop, and let Auralis copy or insert the transcript back into the app you were already using.
   </p>
   <p>
-    <a href="https://github.com/chrisduvillard/auralis-public/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/chrisduvillard/auralis-public/ci.yml?branch=main&label=CI&style=for-the-badge" /></a>
-    <a href="https://github.com/chrisduvillard/auralis-public/actions/workflows/windows-installer.yml"><img alt="Windows installer" src="https://img.shields.io/github/actions/workflow/status/chrisduvillard/auralis-public/windows-installer.yml?branch=main&label=Windows%20installer&style=for-the-badge" /></a>
+    <a href="https://github.com/chrisduvillard/Auralis/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/chrisduvillard/Auralis/ci.yml?branch=main&label=CI&style=for-the-badge" /></a>
+    <a href="https://github.com/chrisduvillard/Auralis/actions/workflows/windows-installer.yml"><img alt="Windows installer" src="https://img.shields.io/github/actions/workflow/status/chrisduvillard/Auralis/windows-installer.yml?branch=main&label=Windows%20installer&style=for-the-badge" /></a>
     <img alt="Electron" src="https://img.shields.io/badge/Electron-39-47848F?style=for-the-badge&logo=electron&logoColor=white" />
     <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-6-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
     <img alt="License" src="https://img.shields.io/badge/license-MIT-111827?style=for-the-badge" />
@@ -66,7 +66,7 @@ Auralis has no required backend, database, API key, or paid speech service. Open
 ### Run from source
 
 ```bash
-git clone https://github.com/chrisduvillard/auralis-public.git
+git clone https://github.com/chrisduvillard/Auralis.git
 cd auralis
 npm ci
 npm run desktop
@@ -238,7 +238,7 @@ Important caveats:
 
 ### App updates
 
-The desktop **Update now** action checks `chrisduvillard/auralis-public` GitHub Releases, downloads and installs the latest published GitHub Release when available, and uses a narrow Electron IPC surface.
+The desktop **Update now** action checks `chrisduvillard/Auralis` GitHub Releases, downloads and installs the latest published GitHub Release when available, and uses a narrow Electron IPC surface.
 
 Publish the NSIS installer plus GitHub Release metadata files such as `latest.yml` so installed clients can discover updates. For `v*` tag releases with Windows signing secrets configured, the current Windows workflow publishes the signed NSIS installer, `Auralis-Setup-*.exe.blockmap`, and `latest*.yml` metadata so the in-app updater can discover and install releases.
 

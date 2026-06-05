@@ -78,7 +78,7 @@ describe("desktop app packaging config", () => {
     expect(packageJson.build?.publish?.[0]).toEqual({
       owner: "chrisduvillard",
       provider: "github",
-      repo: "auralis-public",
+      repo: "Auralis",
     });
   });
 
