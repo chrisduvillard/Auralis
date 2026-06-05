@@ -476,6 +476,43 @@ describe("Auralis app UI", () => {
     expect(root.textContent).toContain("No speech was captured, so nothing was saved.");
   });
 
+  it("keeps shortcut hints hidden by default in a compact disclosure", () => {
+    const { root } = mountApp({ desktop: false });
+    const shortcutDisclosure = root.querySelector<HTMLDetailsElement>(
+      '[data-field="shortcut-map-disclosure"]',
+    );
+    const shortcutMap = root.querySelector<HTMLElement>('[data-field="shortcut-map"]');
+
+    expect(shortcutDisclosure).toBeInstanceOf(HTMLDetailsElement);
+    expect(shortcutDisclosure?.open).toBe(false);
+    expect(shortcutDisclosure?.querySelector("summary")?.textContent).toContain("Shortcuts");
+    expect(shortcutMap?.textContent).toContain("Copy");
+  });
+
+  it("keeps completion details collapsed behind a small status summary", async () => {
+    const { root } = mountApp({ desktop: false });
+    const transcript = root.querySelector<HTMLTextAreaElement>('[data-field="transcript"]');
+    const flashDetails = root.querySelector<HTMLDetailsElement>('[data-field="flash-details"]');
+    const flashSummary = root.querySelector<HTMLElement>('[data-field="flash-summary"]');
+    const flashDetail = root.querySelector<HTMLElement>('[data-field="flash"]');
+
+    expect(transcript).toBeInstanceOf(HTMLTextAreaElement);
+    expect(flashDetails).toBeInstanceOf(HTMLDetailsElement);
+    expect(flashDetails?.hidden).toBe(true);
+    if (!transcript) {
+      throw new Error("Expected transcript textarea to exist.");
+    }
+    transcript.value = "Hey!";
+    transcript.dispatchEvent(new Event("input"));
+
+    button(root, "Copy").click();
+
+    await vi.waitFor(() => expect(flashDetails?.hidden).toBe(false));
+    expect(flashDetails?.open).toBe(false);
+    expect(flashSummary?.textContent).toBe("Copied");
+    expect(flashDetail?.textContent).toBe("Transcript copied to the clipboard.");
+  });
+
   it("keeps the default workspace focused with the archive tucked away", () => {
     const { root } = mountApp({ desktop: false });
     const workspace = root.querySelector<HTMLElement>('[data-field="workspace"]');

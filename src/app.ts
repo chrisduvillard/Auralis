@@ -571,7 +571,10 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
               <button class="button button--ghost" data-action="clear-current" type="button">Clear</button>
             </div>
           </div>
-          <div class="shortcut-map" data-field="shortcut-map" aria-label="Keyboard shortcuts"></div>
+          <details class="shortcut-map-disclosure" data-field="shortcut-map-disclosure">
+            <summary>Shortcuts</summary>
+            <div class="shortcut-map" data-field="shortcut-map" aria-label="Keyboard shortcuts"></div>
+          </details>
           <label class="sr-only" for="transcript-area">Transcript</label>
           <textarea
             id="transcript-area"
@@ -580,7 +583,10 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
             placeholder="Your transcript appears here after you stop recording. You can edit it before copying."
           ></textarea>
           <div class="editor-footer">
-            <p class="flash" data-field="flash" role="status" aria-live="polite"></p>
+            <details class="flash flash--compact" data-field="flash-details" hidden>
+              <summary data-field="flash-summary" role="status" aria-live="polite"></summary>
+              <p data-field="flash" role="status" aria-live="polite"></p>
+            </details>
             <p class="transcript-stats" data-field="transcript-stats"></p>
           </div>
         </article>
@@ -753,6 +759,8 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
   const transcriptStatsField = requiredQuery<HTMLElement>(root, '[data-field="transcript-stats"]');
   const desktopStatusCard = requiredQuery<HTMLElement>(root, '[data-field="desktop-status-card"]');
   const desktopStatusField = requiredQuery<HTMLElement>(root, '[data-field="desktop-status"]');
+  const flashDetails = requiredQuery<HTMLDetailsElement>(root, '[data-field="flash-details"]');
+  const flashSummary = requiredQuery<HTMLElement>(root, '[data-field="flash-summary"]');
   const flashField = requiredQuery<HTMLElement>(root, '[data-field="flash"]');
   const shortcutMap = requiredQuery<HTMLElement>(root, '[data-field="shortcut-map"]');
   const advancedSettings = requiredQuery<HTMLDetailsElement>(
@@ -837,6 +845,28 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
     root,
     '[data-action="save-personal-text"]',
   );
+
+  function flashSummaryText(text: string, tone: FlashTone): string {
+    if (tone === "error") {
+      return "Needs attention";
+    }
+
+    const normalizedText = text.toLowerCase();
+    if (normalizedText.includes("pasted")) {
+      return "Pasted";
+    }
+    if (normalizedText.includes("copied")) {
+      return "Copied";
+    }
+    if (normalizedText.includes("ready")) {
+      return "Ready";
+    }
+    if (normalizedText.includes("saved")) {
+      return "Saved";
+    }
+
+    return text ? "Status" : "";
+  }
 
   function setFlash(tone: FlashTone, text: string): void {
     state.flash = { tone, text };
@@ -1405,10 +1435,17 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
       shortcutMap.append(item);
     }
 
-    flashField.textContent = state.flash?.text ?? "";
-    flashField.dataset.tone = state.flash?.tone ?? "info";
-    flashField.setAttribute("role", state.flash?.tone === "error" ? "alert" : "status");
-    flashField.setAttribute("aria-live", state.flash?.tone === "error" ? "assertive" : "polite");
+    const flashText = state.flash?.text ?? "";
+    const flashTone = state.flash?.tone ?? "info";
+    flashDetails.hidden = flashText.length === 0;
+    flashDetails.open = false;
+    flashDetails.dataset.tone = flashTone;
+    flashSummary.textContent = flashSummaryText(flashText, flashTone);
+    flashSummary.setAttribute("role", flashTone === "error" ? "alert" : "status");
+    flashSummary.setAttribute("aria-live", flashTone === "error" ? "assertive" : "polite");
+    flashField.setAttribute("role", flashTone === "error" ? "alert" : "status");
+    flashField.setAttribute("aria-live", flashTone === "error" ? "assertive" : "polite");
+    flashField.textContent = flashText;
 
     providerSelect.replaceChildren();
     for (const option of PROVIDER_OPTIONS) {

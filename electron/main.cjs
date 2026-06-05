@@ -5,9 +5,11 @@ const {
   globalShortcut,
   ipcMain,
   Menu,
+  nativeImage,
   screen,
   session,
   shell,
+  Tray,
 } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const { execFile, execFileSync, spawn } = require("node:child_process");
@@ -72,6 +74,8 @@ const OPENROUTER_MODELS = new Set(OPENROUTER_TRANSCRIPTION_MODELS.keys());
 const SUPPORTED_LANGUAGES = new Set(["en-US", "en-GB", "de-DE", "fr-FR", "es-ES"]);
 
 let mainWindow = null;
+let tray = null;
+let isQuitting = false;
 let listeningOverlayWindow = null;
 let listeningOverlayReady = false;
 let listeningOverlayFlashTimer = null;
@@ -1615,6 +1619,10 @@ function focusMainWindow() {
     mainWindow.restore();
   }
 
+  if (!mainWindow.isVisible()) {
+    mainWindow.show();
+  }
+
   mainWindow.focus();
   return true;
 }
@@ -1686,6 +1694,53 @@ async function installLatestUpdate() {
 
 function notifyDesktop(message) {
   return flashListeningOverlay(message);
+}
+
+function trayIconImage() {
+  const iconPath = path.join(__dirname, "..", "build", "icon.png");
+  const image = nativeImage.createFromPath(iconPath);
+  return image.isEmpty() ? nativeImage.createEmpty() : image;
+}
+
+function createTray() {
+  if (tray) {
+    return tray;
+  }
+
+  tray = new Tray(trayIconImage());
+  tray.setToolTip("Auralis");
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      {
+        click: () => focusMainWindow(),
+        label: "Show Auralis",
+      },
+      {
+        click: () => sendToRenderer("auralis:desktop-toggle-dictation"),
+        label: "Toggle Dictation",
+      },
+      { type: "separator" },
+      {
+        click: () => {
+          isQuitting = true;
+          app.quit();
+        },
+        label: "Quit Auralis",
+      },
+    ]),
+  );
+  tray.on("click", () => focusMainWindow());
+  return tray;
+}
+
+function handleMainWindowClose(event) {
+  if (isQuitting) {
+    return;
+  }
+
+  event.preventDefault();
+  mainWindow.hide();
+  notifyDesktop("Auralis is still running in the tray.");
 }
 
 function sendToRenderer(channel, payload) {
@@ -1768,6 +1823,7 @@ function createMainWindow() {
   });
 
   mainWindow.webContents.on("render-process-gone", restoreSystemAudioAfterRendererExit);
+  mainWindow.on("close", handleMainWindowClose);
 
   mainWindow.on("closed", () => {
     restoreSystemAudioAfterRendererExit();
@@ -2249,6 +2305,7 @@ ipcMain.handle("auralis:desktop-transcribe-audio", async (event, request) => {
 
 app.whenReady().then(() => {
   configureSessionPermissions();
+  createTray();
   createMainWindow();
   startHoldToTalk();
   registerShortcuts();
@@ -2271,6 +2328,7 @@ function finishQuitAfterAudioRestore() {
 
   if (audioDuckingChangedSystemMute) {
     isRestoringAudioBeforeQuit = false;
+    isQuitting = false;
     notifyDesktop(
       "Auralis could not restore system audio automatically. Please unmute system audio manually, then quit again.",
     );
@@ -2289,6 +2347,8 @@ function finishQuitAfterAudioRestore() {
 }
 
 app.on("before-quit", (event) => {
+  isQuitting = true;
+
   if (allowQuitAfterAudioRestore) {
     allowQuitAfterAudioRestore = false;
     return;
@@ -2317,12 +2377,12 @@ app.on("before-quit", (event) => {
 app.on("will-quit", () => {
   stopHoldToTalk();
   destroyListeningOverlay();
+  tray?.destroy();
+  tray = null;
   stopWhisperWorker("Auralis is quitting.");
   globalShortcut.unregisterAll();
 });
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
+  // Keep Auralis available from the tray after the main window is closed.
 });

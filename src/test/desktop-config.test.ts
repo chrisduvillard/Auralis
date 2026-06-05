@@ -1165,6 +1165,34 @@ with tempfile.TemporaryDirectory() as temp_dir:
     expect(styles).toContain(".capture-strip");
   });
 
+  it("collapses noisy transcript chrome behind compact disclosure controls", () => {
+    const app = readProjectFile("src/app.ts");
+    const styles = readProjectFile("src/styles.css");
+
+    expect(app).toContain('data-field="shortcut-map-disclosure"');
+    expect(app).toContain('data-field="flash-details"');
+    expect(app).toContain('data-field="flash-summary"');
+    expect(styles).toContain(".shortcut-map-disclosure");
+    expect(styles).toContain(".flash--compact");
+    expect(styles).not.toContain(".flash:not(:empty)");
+  });
+
+  it("keeps Auralis running in the tray when the main window is closed", () => {
+    const mainProcess = readProjectFile("electron/main.cjs");
+
+    expect(mainProcess).toContain("Tray,");
+    expect(mainProcess).toContain("let tray = null;");
+    expect(mainProcess).toContain("function createTray()");
+    expect(mainProcess).toContain('mainWindow.on("close", handleMainWindowClose)');
+    expect(mainProcess).toContain("event.preventDefault();\n  mainWindow.hide();");
+    expect(mainProcess).toContain('label: "Show Auralis"');
+    expect(mainProcess).toContain('label: "Quit Auralis"');
+    expect(mainProcess).toContain('app.on("window-all-closed", () => {');
+    expect(mainProcess).not.toContain(
+      'app.on("window-all-closed", () => {\n  if (process.platform !== "darwin") {\n    app.quit();\n  }\n});',
+    );
+  });
+
   it("pastes on Windows without restoring or resizing the target window", () => {
     const mainProcess = readProjectFile("electron/main.cjs");
 
