@@ -886,9 +886,10 @@ describe("desktop app packaging config", () => {
         .digest("hex"),
     ).toBe("3cfa3c3c3a8d5e5e00fd20fb8c37b62edc117ea2702061d661a84f4440ac1024");
     expect(readme).toContain(
-      '<img src="src/assets/auralis-lynx-hero.png" alt="Auralis full lynx hero artwork" />',
+      '<img src="src/assets/auralis-lynx-hero.png" alt="Auralis full lynx hero artwork" width="360" />',
     );
     expect(readme).not.toContain("src/assets/auralis-lynx-readme.png");
+    expect(readme).not.toContain('alt="Auralis full lynx hero artwork" />');
     expect(readme).not.toContain('width="88"');
     expect(readme).toContain("Transcript-first desktop dictation");
     expect(readme).toContain("## Why Auralis");
