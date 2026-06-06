@@ -865,6 +865,21 @@ describe("desktop app packaging config", () => {
     );
   });
 
+  it("anchors the polished README to the lynx avatar and proof-first product framing", () => {
+    const readme = readProjectFile("README.md");
+
+    expect(existsSync(join(projectRoot, "src/assets/auralis-lynx-avatar.png"))).toBe(true);
+    expect(readme).toContain("src/assets/auralis-lynx-avatar.png");
+    expect(readme).toContain('alt="Auralis lynx avatar"');
+    expect(readme).toContain("Transcript-first desktop dictation");
+    expect(readme).toContain("## At a glance");
+    expect(readme).toContain("## Proof, not promises");
+    expect(readme).toContain("Local-first by default");
+    expect(readme).toContain("Provider boundary");
+    expect(readme).toContain("Signed stable releases");
+    expect(readme).not.toContain('src="build/icon.png"');
+  });
+
   it("keeps no-cost beta trust docs visible and explicit", () => {
     const readme = readProjectFile("README.md");
     const privacy = readProjectFile("docs/privacy-data-flow.md");

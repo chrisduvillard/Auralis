@@ -1,30 +1,44 @@
 <div align="center">
-  <img src="build/icon.png" alt="Auralis icon" width="96" height="96" />
+  <img src="src/assets/auralis-lynx-avatar.png" alt="Auralis lynx avatar" width="112" height="112" />
 
   # Auralis
 
-  **Hold a shortcut. Talk. Release. Get text where your cursor already is.**
+  **Transcript-first desktop dictation. Hold a shortcut, speak, and keep writing.**
 
   <p>
-    <a href="https://github.com/chrisduvillard/Auralis/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/chrisduvillard/Auralis/ci.yml?branch=main&label=CI&style=for-the-badge" /></a>
-    <a href="https://github.com/chrisduvillard/Auralis/actions/workflows/windows-installer.yml"><img alt="Windows installer" src="https://img.shields.io/github/actions/workflow/status/chrisduvillard/Auralis/windows-installer.yml?branch=main&label=Windows%20installer&style=for-the-badge" /></a>
-    <img alt="Electron" src="https://img.shields.io/badge/Electron-39-47848F?style=for-the-badge&logo=electron&logoColor=white" />
-    <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-6-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
-    <img alt="License" src="https://img.shields.io/badge/license-MIT-111827?style=for-the-badge" />
+    <a href="https://github.com/chrisduvillard/Auralis/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/chrisduvillard/Auralis/ci.yml?branch=main&label=CI&style=flat-square" /></a>
+    <a href="https://github.com/chrisduvillard/Auralis/actions/workflows/windows-installer.yml"><img alt="Windows installer" src="https://img.shields.io/github/actions/workflow/status/chrisduvillard/Auralis/windows-installer.yml?branch=main&label=Windows%20installer&style=flat-square" /></a>
+    <img alt="Electron 39" src="https://img.shields.io/badge/Electron-39-47848F?style=flat-square&logo=electron&logoColor=white" />
+    <img alt="TypeScript 6" src="https://img.shields.io/badge/TypeScript-6-3178C6?style=flat-square&logo=typescript&logoColor=white" />
+    <img alt="MIT license" src="https://img.shields.io/badge/license-MIT-111827?style=flat-square" />
+  </p>
+
+  <p>
+    <a href="#quick-start">Quick start</a> ·
+    <a href="#daily-use">Daily use</a> ·
+    <a href="#transcription-choices">Providers</a> ·
+    <a href="#privacy-and-storage">Privacy</a> ·
+    <a href="#proof-not-promises">Proof</a>
   </p>
 </div>
 
 ---
 
-## What it does
-
-Auralis is a small desktop dictation app.
+Auralis is a minimalist Electron desktop app for turning speech into editable text. It works best as a desktop app. It can transcribe locally with Whisper, or optionally use OpenRouter when cloud transcription speed matters.
 
 ```text
-Put cursor in any app -> hold Ctrl + Win -> speak -> release -> text is copied or pasted
+Cursor in target app -> hold Ctrl + Win -> speak -> release -> transcript copied or inserted
 ```
 
-It works best as a desktop app. It can transcribe locally with Whisper, or optionally use OpenRouter when cloud transcription speed matters.
+## At a glance
+
+| Principle | What it means |
+| --- | --- |
+| **Transcript-first desktop dictation** | The main surface is the text you just created, not a chatbot or recorder dashboard. |
+| **Local-first by default** | Fresh desktop profiles default to app-managed local Whisper with no required backend or API key. |
+| **Provider boundary** | OpenRouter STT is explicit and optional; Browser Web Speech remains a browser-dependent fallback. |
+| **Cursor-aware workflow** | Global-shortcut recordings can attempt paste into the previous app; button-started recordings copy only. |
+| **Signed stable releases** | Windows preview artifacts are unsigned; updater-visible public releases require signed `v*` tag builds. |
 
 ## Quick start
 
@@ -90,11 +104,11 @@ If a shortcut is already taken, Auralis tries a safer fallback and shows the act
 
 ## Transcription choices
 
-| Provider | Best for | Notes |
-| --- | --- | --- |
-| **Desktop local Whisper** | Offline or private dictation | Uses app-managed `faster-whisper`; first run downloads packages and models |
-| **OpenRouter STT** | Faster cloud transcription | Optional; sends recorded audio from Electron main to OpenRouter |
-| **Browser Web Speech API** | Browser-only development | Chrome and Edge behavior varies; some browsers may use vendor cloud speech services |
+| Provider | Best for | Requires API key | Audio leaves device? | Notes |
+| --- | --- | --- | --- | --- |
+| **Desktop local Whisper** | Offline or private dictation | No | No after first-run setup | Uses app-managed `faster-whisper`; first run downloads packages and models |
+| **OpenRouter STT** | Faster cloud transcription | Yes | Yes, to OpenRouter | Optional; sends recorded audio from Electron main to OpenRouter |
+| **Browser Web Speech API** | Browser-only development | No app key | Browser-dependent | Chrome and Edge behavior varies; some browsers may use vendor cloud speech services |
 
 ### Local Whisper models
 
@@ -126,7 +140,11 @@ Default model: `OpenRouter Whisper Large v3 Turbo (fastest)`.
 | Linux/Wayland | Most compositors block synthetic keyboard input; Auralis falls back to clipboard copy |
 | macOS | Electron shell can run; copy-to-clipboard is the safe documented behavior |
 
+Linux Wayland usually blocks automatic paste. In that case, Auralis still copies the transcript so you can press `Ctrl+V` yourself.
+
 ## Privacy and storage
+
+Auralis does not require a backend. Privacy depends on the selected provider and on operating-system surfaces such as the clipboard.
 
 - No required backend
 - No required API key
@@ -138,6 +156,21 @@ Default model: `OpenRouter Whisper Large v3 Turbo (fastest)`.
 - Browser Web Speech privacy depends on the browser engine
 - See [`docs/privacy-data-flow.md`](./docs/privacy-data-flow.md) for the full microphone, clipboard, LocalStorage, provider, and deletion boundary
 - See [`SECURITY.md`](./SECURITY.md) for vulnerability reporting and security-sensitive surfaces
+
+## Proof, not promises
+
+Auralis keeps distribution and validation claims scoped to evidence.
+
+| Proof surface | What it proves | What it does not prove |
+| --- | --- | --- |
+| `npm test -- --run` | Renderer, settings, storage, Electron contract, and README behavior regressions | Real microphone quality or physical OS paste on your machine |
+| `npm run desktop:check` | Electron shell can start far enough to report version under the smoke environment | Full interactive dictation |
+| `xvfb-run -a npm run desktop:smoke` | Headless desktop launch path under Xvfb | Real display-manager focus behavior |
+| Windows installer workflow | Silent install, installed-app launch, Notepad paste mechanism smoke, and release asset assertions | Broad physical-device proof across user machines |
+
+Headless tests use fake speech and recording implementations. They do not prove real microphone quality or real OS paste behavior on your machine.
+
+The Windows workflow verifies silent install and installed-app launch, then attempts the uninstaller when it is present. It also runs a Notepad auto-paste mechanism smoke test.
 
 ## Project docs
 
@@ -219,10 +252,6 @@ npm run stt:proof -- --dry-run --format markdown
 
 OpenRouter calls are skipped unless both `OPENROUTER_API_KEY` and `--allow-network` are present.
 
-Headless tests use fake speech and recording implementations. They do not prove real microphone quality or real OS paste behavior on your machine.
-
-The Windows workflow verifies silent install and installed-app launch, then attempts the uninstaller when it is present. It also runs a Notepad auto-paste mechanism smoke test.
-
 ## Linux sandbox
 
 Auralis refuses to start on Linux if Electron's sandbox helper is not root-owned setuid.
@@ -246,6 +275,8 @@ Do not use `AURALIS_ALLOW_NO_SANDBOX=1` as the normal launch path.
 
 <details>
 <summary>Local Whisper tuning</summary>
+
+Auralis keeps a persistent local Whisper worker warm across transcription jobs unless disabled.
 
 Useful environment variables:
 
