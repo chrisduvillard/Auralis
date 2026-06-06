@@ -30,14 +30,14 @@ Important expectations:
 - OpenRouter STT sends recorded audio to OpenRouter from Electron main when selected.
 - Browser Web Speech privacy behavior depends on the browser engine.
 - Desktop local Whisper setup may download Python packages and model artifacts before offline transcription is available.
-- Public Windows updater releases require signing certificate secrets before publication.
+- Public Windows updater releases may be signed or unsigned; unsigned releases are for personal or explicitly trusted installs.
 
 ## Release integrity
 
 GitHub Actions are pinned to full commit SHAs, with the upstream tag noted in comments.
 
-Updater-visible Windows releases can be published by the current workflow from successful, non-canceled pushes to `main` in the public `chrisduvillard/Auralis` repository, or from intentional `v*` tag pushes, only when Windows signing certificate secrets are configured.
+Updater-visible Windows releases can be published by the current workflow from successful, non-canceled pushes to `main` in the public `chrisduvillard/Auralis` repository, or from intentional `v*` tag pushes. The release body records whether the installer was signed or unsigned.
 
-Both public main-push releases and intentional `v*` tag releases fail closed by skipping updater-visible publication unless `WINDOWS_CERTIFICATE_P12` and `WINDOWS_CERTIFICATE_PASSWORD` are configured. Unsigned local and CI Windows installer builds are for development and smoke testing, not broad public distribution.
+Public main-push releases and intentional `v*` tag releases are updater-visible even when unsigned so installed personal builds can update to the current public release. Unsigned updater-visible releases are for personal or explicitly trusted installs, not broad public distribution. Configure `WINDOWS_CERTIFICATE_P12` and `WINDOWS_CERTIFICATE_PASSWORD` before relying on the GitHub Releases feed for public trust-sensitive distribution.
 
 Enforce branch protection, protected or signed release tags, and repository rulesets before relying on the GitHub Releases feed for public updates.

@@ -25,7 +25,7 @@ jobs:
     outputs:
       release-tag: ${{ steps.release-version.outputs.tag }}
       release-version: ${{ steps.release-version.outputs.version }}
-      publish-release: ${{ steps.signing.outputs.publish-release }}
+      release-signing-status: ${{ steps.signing.outputs.release-signing-status }}
 
     steps:
       - name: Check out repository
@@ -87,8 +87,8 @@ jobs:
         run: |
           if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_P12) -or [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)) {
             "CSC_IDENTITY_AUTO_DISCOVERY=false" | Out-File -FilePath $env:GITHUB_ENV -Append
-            "publish-release=false" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-            Write-Host "Windows signing certificate not configured; building unsigned artifact and skipping updater-visible release publication."
+            "release-signing-status=unsigned" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+            Write-Host "Windows signing certificate not configured; building unsigned updater-compatible artifact."
             exit 0
           }
 
@@ -97,7 +97,7 @@ jobs:
           "CSC_LINK=$certPath" | Out-File -FilePath $env:GITHUB_ENV -Append
           "CSC_KEY_PASSWORD=$env:WINDOWS_CERTIFICATE_PASSWORD" | Out-File -FilePath $env:GITHUB_ENV -Append
           "AURALIS_WINDOWS_SIGNING=1" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "publish-release=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "release-signing-status=signed" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Host "Windows signing certificate configured for electron-builder."
 
       - name: Build Windows NSIS installer
@@ -110,7 +110,7 @@ jobs:
       - name: Assert Windows release assets
         shell: pwsh
         env:
-          AURALIS_REQUIRE_UPDATE_METADATA: ${{ steps.signing.outputs.publish-release == 'true' && '1' || '0' }}
+          AURALIS_REQUIRE_UPDATE_METADATA: "1"
         run: node scripts/assert-windows-release-assets.cjs
 
       - name: Smoke installed Windows app
@@ -174,7 +174,7 @@ jobs:
           retention-days: 30
 
   release-windows-installer:
-    if: github.event_name == 'push' && needs.build-windows-installer.outputs.publish-release == 'true' && (startsWith(github.ref, 'refs/tags/v') || (github.repository == 'chrisduvillard/Auralis' && github.ref == 'refs/heads/main'))
+    if: github.repository == 'chrisduvillard/Auralis' && github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main')
     needs: build-windows-installer
     runs-on: ubuntu-latest
     permissions:
@@ -194,7 +194,11 @@ jobs:
           target_commitish: ${{ github.sha }}
           make_latest: true
           body: |
-            This signed release is created for a successful, non-canceled public main push or an intentional `v*` tag.
+            This release is created for a successful, non-canceled public main push or an intentional `v*` tag.
+
+            Release signing status: `${{ needs.build-windows-installer.outputs.release-signing-status }}`.
+
+            Unsigned releases are updater-compatible but may show Windows SmartScreen or installer trust prompts. Do not treat unsigned builds as broadly trusted public distribution.
 
             It contains the Windows NSIS installer, blockmap, and `latest.yml` metadata required by the installed Auralis app's Update now button.
           files: |

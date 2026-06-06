@@ -153,9 +153,9 @@ release/Auralis-Setup-*.exe
 
 In the installed Windows app, **Update now** checks GitHub Releases for `chrisduvillard/Auralis`, then downloads and installs the latest updater-compatible Windows release when available.
 
-When Windows signing certificate secrets are configured, the Windows installer workflow publishes updater-visible releases from successful, non-canceled public `main` pushes in `chrisduvillard/Auralis`, and from intentional `v*` tag releases. It publishes the signed NSIS installer, `Auralis-Setup-*.exe.blockmap`, and GitHub Release metadata files such as `latest.yml`.
+The Windows installer workflow publishes updater-visible releases from successful, non-canceled public `main` pushes in `chrisduvillard/Auralis`, and from intentional `v*` tag releases. It publishes the NSIS installer, `Auralis-Setup-*.exe.blockmap`, and GitHub Release metadata files such as `latest.yml`.
 
-Without signing certificate secrets, the workflow builds an unsigned artifact and skips updater-visible release publication. Local Windows installer builds remain unsigned unless signing is explicitly enabled.
+Unsigned updater-compatible releases are published when signing secrets are absent so the installed app's **Update now** button can still move to the current public release. Unsigned releases may show Windows SmartScreen or installer trust prompts and should be treated as personal or explicitly trusted installs, not broadly trusted public distribution. Local Windows installer builds remain unsigned unless signing is explicitly enabled.
 
 Private GitHub repositories are not a public update channel. Do not ship a GitHub token inside the app.
 
@@ -255,4 +255,4 @@ Remove those overrides only after upstream packages no longer resolve `boolean`,
 - Local Whisper first run can take time to download and warm up
 - Browser Web Speech support and privacy behavior vary by browser
 - OpenRouter STT is configured through `OPENROUTER_API_KEY`, not an in-app key field
-- Unsigned Windows builds should be treated as development builds only
+- Unsigned Windows releases may be updater-compatible but are not broadly trusted public distribution
