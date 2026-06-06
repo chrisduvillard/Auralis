@@ -1,3 +1,4 @@
+import lynxAvatarUrl from "./assets/auralis-lynx-avatar.png";
 import { desktopWhisperSupported, startDesktopWhisperSession } from "./lib/desktopSpeech";
 import {
   applyPersonalTextSettings,
@@ -499,7 +500,9 @@ export function mountVoiceToTextApp(root: HTMLDivElement, target: BrowserWindow)
     <main class="shell" data-field="shell">
       <header class="app-topbar" aria-label="Auralis app header">
         <div class="brand-lockup">
-          <span class="brand-mark" aria-hidden="true">A</span>
+          <span class="brand-mark brand-mark--avatar" data-field="brand-avatar" aria-hidden="true">
+            <img src="${lynxAvatarUrl}" alt="" draggable="false" decoding="async" />
+          </span>
           <div class="brand-copy">
             <p class="brand-name">Auralis <span class="brand-version" data-field="brand-version"></span></p>
             <p class="brand-subtitle">Local desktop dictation</p>

@@ -376,6 +376,24 @@ describe("Auralis app UI", () => {
     expect(root.querySelector(".command-strip")).toBeNull();
   });
 
+  it("uses the lynx as a restrained decorative app avatar only in the topbar", () => {
+    const { root } = mountApp({ desktop: false });
+    const brandMark = root.querySelector<HTMLElement>('[data-field="brand-avatar"]');
+    const topbar = root.querySelector<HTMLElement>(".app-topbar");
+    const avatar = brandMark?.querySelector<HTMLImageElement>("img");
+
+    expect(brandMark).not.toBeNull();
+    expect(topbar?.contains(brandMark ?? null)).toBe(true);
+    expect(brandMark?.classList.contains("brand-mark--avatar")).toBe(true);
+    expect(brandMark?.getAttribute("aria-hidden")).toBe("true");
+    expect(avatar?.getAttribute("alt")).toBe("");
+    expect(avatar?.getAttribute("draggable")).toBe("false");
+    expect(avatar?.getAttribute("src")).toContain("auralis-lynx-avatar");
+    expect(root.querySelector('[data-field="lynx-hero"]')).toBeNull();
+    expect(root.querySelector('[data-field="theme-atmosphere"]')).toBeNull();
+    expect(root.querySelectorAll(".brand-mark img")).toHaveLength(1);
+  });
+
   it("uses a clearer compact headline for desktop dictation", () => {
     installFakeMediaRecorder();
     Object.defineProperty(window, "auralisDesktop", {
