@@ -151,6 +151,12 @@ Installer output:
 release/Auralis-Setup-*.exe
 ```
 
+### Windows preview build
+
+Windows builds are currently unsigned because Auralis does not pay for a code-signing certificate yet. Windows SmartScreen may warn on first install.
+
+Use GitHub prereleases or workflow artifacts for manual preview installs only; they are not the stable updater channel.
+
 In the installed Windows app, **Update now** checks GitHub Releases for `chrisduvillard/Auralis`, then downloads and installs the latest updater-compatible Windows release when available.
 
 The Windows installer workflow builds and smokes installer artifacts on `main`, but updater-visible public releases are published only from intentional signed `v*` tags. It publishes the signed NSIS installer, `Auralis-Setup-*.exe.blockmap`, and GitHub Release metadata files such as `latest.yml`.

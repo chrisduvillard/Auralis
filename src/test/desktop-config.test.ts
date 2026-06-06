@@ -846,6 +846,13 @@ describe("desktop app packaging config", () => {
     expect(readme).toContain("The key is read by Electron main.");
     expect(readme).toContain("Local transcript history is opt-in");
     expect(readme).toContain("Do not use `AURALIS_ALLOW_NO_SANDBOX=1` as the normal launch path.");
+    expect(readme).toContain("### Windows preview build");
+    expect(readme).toContain(
+      "Windows builds are currently unsigned because Auralis does not pay for a code-signing certificate yet.",
+    );
+    expect(readme).toContain(
+      "Use GitHub prereleases or workflow artifacts for manual preview installs only; they are not the stable updater channel.",
+    );
     expect(readme).toContain(
       "The Windows installer workflow builds and smokes installer artifacts on `main`, but updater-visible public releases are published only from intentional signed `v*` tags.",
     );
