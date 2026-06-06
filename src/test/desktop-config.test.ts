@@ -865,6 +865,44 @@ describe("desktop app packaging config", () => {
     );
   });
 
+  it("keeps no-cost beta trust docs visible and explicit", () => {
+    const readme = readProjectFile("README.md");
+    const privacy = readProjectFile("docs/privacy-data-flow.md");
+    const releaseProof = readProjectFile("docs/release-proof-checklist.md");
+    const contributing = readProjectFile("CONTRIBUTING.md");
+    const changelog = readProjectFile("CHANGELOG.md");
+
+    expect(readme).toContain("docs/privacy-data-flow.md");
+    expect(readme).toContain("docs/release-proof-checklist.md");
+    expect(readme).toContain("CONTRIBUTING.md");
+    expect(readme).toContain("CHANGELOG.md");
+    expect(privacy).toContain(
+      "Clipboard text is visible to the operating system and clipboard managers",
+    );
+    expect(privacy).toContain(
+      "LocalStorage is local plaintext profile storage, not encrypted vault storage",
+    );
+    expect(privacy).toContain(
+      "OpenRouter STT sends recorded audio to OpenRouter only when selected",
+    );
+    expect(privacy).toContain("Browser Web Speech may use browser-vendor speech services");
+    expect(privacy).toContain(
+      "First-run Local Whisper setup downloads Python packages and model artifacts",
+    );
+    expect(releaseProof).toContain("Unsigned preview builds are not stable updater releases");
+    expect(releaseProof).toContain(
+      "Do not cut or publish a stable `v*` release without Windows signing secrets",
+    );
+    expect(releaseProof).toContain("Real Windows interactive smoke");
+    expect(releaseProof).toContain("non-dry-run local Whisper proof");
+    expect(contributing).toContain("npm audit --audit-level=high");
+    expect(contributing).toContain(
+      "Do not add secrets, tokens, certificates, transcripts, or local private paths",
+    );
+    expect(changelog).toContain("## [0.1.14]");
+    expect(changelog).toContain("Unsigned Windows preview posture");
+  });
+
   it("documents the higher-accuracy local Whisper small and medium options", () => {
     const readme = readProjectFile("README.md");
 

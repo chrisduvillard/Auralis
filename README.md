@@ -130,12 +130,21 @@ Default model: `OpenRouter Whisper Large v3 Turbo (fastest)`.
 
 - No required backend
 - No required API key
-- Local Whisper records microphone audio locally and deletes temporary audio files after transcription
+- Local Whisper records microphone audio locally and deletes temporary audio files after normal transcription completion
 - Local transcript history is opt-in
 - History is stored only in the current browser or Electron profile
+- Clipboard text is visible to the operating system and clipboard managers while copied
 - OpenRouter STT is optional and sends recorded audio to OpenRouter when selected
 - Browser Web Speech privacy depends on the browser engine
+- See [`docs/privacy-data-flow.md`](./docs/privacy-data-flow.md) for the full microphone, clipboard, LocalStorage, provider, and deletion boundary
 - See [`SECURITY.md`](./SECURITY.md) for vulnerability reporting and security-sensitive surfaces
+
+## Project docs
+
+- [`CONTRIBUTING.md`](./CONTRIBUTING.md): setup, validation, and secret-safe contribution rules
+- [`CHANGELOG.md`](./CHANGELOG.md): user-visible changes
+- [`docs/privacy-data-flow.md`](./docs/privacy-data-flow.md): privacy and local data-flow boundary
+- [`docs/release-proof-checklist.md`](./docs/release-proof-checklist.md): preview vs stable release proof requirements
 
 ## Updates and Windows installer
 
