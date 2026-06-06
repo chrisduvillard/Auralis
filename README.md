@@ -159,6 +159,18 @@ Unsigned updater-compatible releases are published when signing secrets are abse
 
 Private GitHub repositories are not a public update channel. Do not ship a GitHub token inside the app.
 
+### PowerShell fallback updater
+
+If the in-app **Update now** button is blocked or unreliable on your Windows machine, use the first-party PowerShell fallback updater from this repo. It downloads the latest public GitHub Release, verifies the installer SHA512 against `latest.yml`, closes Auralis, installs silently, and relaunches the app.
+
+From a cloned checkout:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/update-auralis.ps1
+```
+
+The SHA512 check verifies the installer matches the GitHub Release metadata. It is an integrity guard for the public release feed, not a substitute for publisher signing. This fallback still uses the same public updater-compatible release assets. It does not make unsigned builds trusted; Windows may still show SmartScreen or installer trust prompts.
+
 ## Validate locally
 
 ```bash

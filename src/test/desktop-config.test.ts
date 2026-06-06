@@ -1398,6 +1398,37 @@ with tempfile.TemporaryDirectory() as temp_dir:
     expect(workflow).toContain("Unsigned releases are updater-compatible");
   });
 
+  it("ships a secret-free PowerShell fallback updater for Windows installs", () => {
+    const updaterPath = join(projectRoot, "scripts/update-auralis.ps1");
+
+    expect(existsSync(updaterPath)).toBe(true);
+
+    const updater = readProjectFile("scripts/update-auralis.ps1");
+    const readme = readProjectFile("README.md");
+
+    expect(updater).toContain("Param(");
+    expect(updater).toContain('"https://api.github.com/repos/$Repo/releases/latest"');
+    expect(updater).toContain('"User-Agent" = "Auralis-PowerShell-Updater"');
+    expect(updater).toContain("latest.yml");
+    expect(updater).toContain("Get-LatestYamlInstallerPath");
+    expect(updater).toContain("^Auralis-Setup-[0-9]+\\.[0-9]+\\.[0-9]+\\.exe$");
+    expect(updater).toContain("Where-Object { $_.name -eq $installerFileName }");
+    expect(updater).toContain('throw "latest.yml points to installer');
+    expect(updater).toContain("Get-FileHash -Algorithm SHA512");
+    expect(updater).toContain('Stop-Process -Name "Auralis"');
+    expect(updater).toContain('Start-Process -FilePath $installerPath -ArgumentList "/S"');
+    expect(updater).toContain("Programs\\Auralis\\Auralis.exe");
+    expect(updater).not.toContain("GITHUB_TOKEN");
+    expect(updater).not.toContain("Authorization");
+
+    expect(readme).toContain("PowerShell fallback updater");
+    expect(readme).toContain(
+      "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/update-auralis.ps1",
+    );
+    expect(readme).toContain("verifies the installer SHA512");
+    expect(readme).toContain("not a substitute for publisher signing");
+  });
+
   it("declares a restrictive renderer content security policy", () => {
     const html = readProjectFile("index.html");
 
