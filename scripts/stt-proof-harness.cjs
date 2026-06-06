@@ -3,6 +3,7 @@
 const { spawnSync } = require("node:child_process");
 const { existsSync, readFileSync } = require("node:fs");
 const path = require("node:path");
+const { createChildProcessEnv } = require("../electron/child-env.cjs");
 
 const projectRoot = path.resolve(__dirname, "..");
 const defaultAudioMimeType = "audio/webm;codecs=opus";
@@ -324,7 +325,7 @@ function runLocalWhisper(check, options) {
     {
       cwd: projectRoot,
       encoding: "utf-8",
-      env: process.env,
+      env: createChildProcessEnv({}, { includeWhisperEnv: true }),
       timeout: 180_000,
     },
   );

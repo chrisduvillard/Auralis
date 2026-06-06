@@ -23,6 +23,7 @@ const {
   isAuralisMediaPermissionRequest,
   isRendererUrl: isRendererUrlForApp,
 } = require("./permissions.cjs");
+const { createChildProcessEnv } = require("./child-env.cjs");
 const { createHoldToTalkController, createUiohookBackend } = require("./hold-to-talk.cjs");
 
 const TOGGLE_SHORTCUT = "Control+Alt+Space";
@@ -425,6 +426,7 @@ function execFileQuiet(command, args, options = {}) {
       command,
       args,
       {
+        env: createChildProcessEnv(),
         timeout: 3000,
         windowsHide: true,
         ...options,
@@ -444,7 +446,7 @@ function execFileQuiet(command, args, options = {}) {
 
 function commandExists(command, args = ["--version"]) {
   try {
-    execFileSync(command, args, { stdio: "ignore", timeout: 1000 });
+    execFileSync(command, args, { env: createChildProcessEnv(), stdio: "ignore", timeout: 1000 });
     return true;
   } catch {
     return false;
@@ -457,6 +459,7 @@ function execFileCapture(command, args, options = {}) {
       command,
       args,
       {
+        env: createChildProcessEnv(),
         maxBuffer: 1024 * 1024,
         timeout: 10_000,
         windowsHide: true,
@@ -621,11 +624,10 @@ async function setWindowsDefaultAudioMute(muted, deviceKey = null) {
       ),
     ],
     {
-      env: {
-        ...process.env,
+      env: createChildProcessEnv({
         AURALIS_AUDIO_DEVICE_ID: deviceKey || "",
         AURALIS_AUDIO_MUTE: muted ? "1" : "0",
-      },
+      }),
       timeout: 3000,
     },
   );
@@ -785,12 +787,14 @@ function uniquePythonCandidates(candidates) {
 }
 
 function whisperEnv({ offline = true } = {}) {
-  const env = {
-    ...process.env,
-    AURALIS_WHISPER_MODEL_DIR: process.env.AURALIS_WHISPER_MODEL_DIR || whisperModelDir(),
-    AURALIS_WHISPER_RUNTIME_DIR: whisperRuntimeDir(),
-    AURALIS_WHISPER_USE_UV_CACHE: process.env.AURALIS_WHISPER_USE_UV_CACHE || "0",
-  };
+  const env = createChildProcessEnv(
+    {
+      AURALIS_WHISPER_MODEL_DIR: process.env.AURALIS_WHISPER_MODEL_DIR || whisperModelDir(),
+      AURALIS_WHISPER_RUNTIME_DIR: whisperRuntimeDir(),
+      AURALIS_WHISPER_USE_UV_CACHE: process.env.AURALIS_WHISPER_USE_UV_CACHE || "0",
+    },
+    { includeWhisperEnv: true },
+  );
 
   if (offline) {
     env.HF_HUB_OFFLINE = "1";
@@ -872,7 +876,7 @@ async function findWhisperPython() {
 async function findBootstrapPython() {
   for (const candidate of bootstrapPythonCandidates()) {
     const result = await execPythonCapture(candidate, ["--version"], {
-      env: process.env,
+      env: createChildProcessEnv(),
       timeout: 3000,
     });
 
@@ -940,7 +944,7 @@ let whisperBootstrapInProgress = false;
 
 async function managedWhisperPythonUsable(managedPython) {
   const versionResult = await execPythonCapture(managedPython, ["--version"], {
-    env: process.env,
+    env: createChildProcessEnv(),
     timeout: 5000,
   });
 
@@ -949,7 +953,7 @@ async function managedWhisperPythonUsable(managedPython) {
   }
 
   const pipResult = await execPythonCapture(managedPython, ["-m", "pip", "--version"], {
-    env: process.env,
+    env: createChildProcessEnv(),
     timeout: 5000,
   });
 
@@ -961,7 +965,7 @@ async function recreateManagedWhisperVenv(runtimeDir) {
   await fs.promises.rm(venvDir, { force: true, recursive: true });
   const bootstrapPython = await findBootstrapPython();
   const venvResult = await execPythonCapture(bootstrapPython, ["-m", "venv", venvDir], {
-    env: process.env,
+    env: createChildProcessEnv(),
     maxBuffer: 5 * 1024 * 1024,
     timeout: 120_000,
   });
@@ -1487,6 +1491,7 @@ function captureLinuxActiveWindow() {
   try {
     const windowId = execFileSync("xdotool", ["getactivewindow"], {
       encoding: "utf8",
+      env: createChildProcessEnv(),
       timeout: 1000,
     }).trim();
 
@@ -1517,7 +1522,7 @@ public static class AuralisWin32Focus {
     const handle = execFileSync(
       powershellExecutable(),
       ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
-      { encoding: "utf8", timeout: 1500, windowsHide: true },
+      { encoding: "utf8", env: createChildProcessEnv(), timeout: 1500, windowsHide: true },
     ).trim();
 
     if (!/^\d+$/.test(handle) || handle === "0") {
@@ -2133,10 +2138,9 @@ if ([AuralisWin32Paste]::GetForegroundWindow() -ne $hwnd) {
     powershellExecutable(),
     ["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
     {
-      env: {
-        ...process.env,
+      env: createChildProcessEnv({
         AURALIS_TARGET_HWND: pasteTarget.handle,
-      },
+      }),
       timeout: 3000,
     },
   );

@@ -48,28 +48,11 @@ jobs:
         run: |
           $packageVersion = node -p "require('./package.json').version"
           $isTagPush = "${{ startsWith(github.ref, 'refs/tags/v') }}" -eq "true"
-          $isPublicMainPush = "${{ github.repository == 'chrisduvillard/Auralis' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}" -eq "true"
           $releaseVersion = $packageVersion
           $releaseTag = "v$packageVersion"
 
-          if ($isTagPush) {
-            if ($env:GITHUB_REF_NAME -ne "v$packageVersion") {
-              throw "Release tag $env:GITHUB_REF_NAME must match package.json version v$packageVersion."
-            }
-            $releaseTag = $env:GITHUB_REF_NAME
-          } elseif ($isPublicMainPush) {
-            $parts = $packageVersion.Split(".")
-            if ($parts.Length -ne 3) {
-              throw "Expected semantic package version x.y.z, got $packageVersion."
-            }
-            $runPatch = [int]$env:GITHUB_RUN_NUMBER
-            $basePatch = [int]$parts[2]
-            if ($runPatch -le $basePatch) {
-              $runPatch = $basePatch + 1
-            }
-            $releaseVersion = "$($parts[0]).$($parts[1]).$runPatch"
-            npm version $releaseVersion --no-git-tag-version --allow-same-version
-            $releaseTag = "v$releaseVersion"
+          if ($isTagPush -and $env:GITHUB_REF_NAME -ne "v$packageVersion") {
+            throw "Release tag $env:GITHUB_REF_NAME must match package.json version v$packageVersion."
           }
 
           "version=$releaseVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
@@ -88,7 +71,7 @@ jobs:
           if ([string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_P12) -or [string]::IsNullOrWhiteSpace($env:WINDOWS_CERTIFICATE_PASSWORD)) {
             "CSC_IDENTITY_AUTO_DISCOVERY=false" | Out-File -FilePath $env:GITHUB_ENV -Append
             "release-signing-status=unsigned" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
-            Write-Host "Windows signing certificate not configured; building unsigned updater-compatible artifact."
+            Write-Host "Windows signing certificate not configured; building unsigned smoke artifact only. Public release publication requires signed tag builds."
             exit 0
           }
 
@@ -100,8 +83,28 @@ jobs:
           "release-signing-status=signed" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Write-Host "Windows signing certificate configured for electron-builder."
 
+      - name: Require signed installer for public release tag
+        if: startsWith(github.ref, 'refs/tags/v') && steps.signing.outputs.release-signing-status != 'signed'
+        shell: pwsh
+        run: |
+          throw "Public release tags require WINDOWS_CERTIFICATE_P12 and WINDOWS_CERTIFICATE_PASSWORD so updater-visible releases are signed."
+
       - name: Build Windows NSIS installer
         run: npm run package:win
+
+      - name: Verify signed Windows installer
+        if: steps.signing.outputs.release-signing-status == 'signed'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -Path "release" -Filter "Auralis-Setup-*.exe" | Select-Object -First 1
+          if ($null -eq $installer) {
+            throw "Auralis Windows installer was not produced."
+          }
+          $signature = Get-AuthenticodeSignature -FilePath $installer.FullName
+          Write-Host "Installer signature status: $($signature.Status)"
+          if ($signature.Status -ne "Valid") {
+            throw "Signed public releases require a valid Authenticode signature."
+          }
 
       - name: Generate Windows update metadata
         shell: pwsh
@@ -174,7 +177,7 @@ jobs:
           retention-days: 30
 
   release-windows-installer:
-    if: github.repository == 'chrisduvillard/Auralis' && github.event_name == 'push' && (startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main')
+    if: github.repository == 'chrisduvillard/Auralis' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') && needs.build-windows-installer.outputs.release-signing-status == 'signed'
     needs: build-windows-installer
     runs-on: ubuntu-latest
     permissions:
@@ -194,13 +197,11 @@ jobs:
           target_commitish: ${{ github.sha }}
           make_latest: true
           body: |
-            This release is created for a successful, non-canceled public main push or an intentional `v*` tag.
+            This release is created for an intentional signed `v*` tag.
 
             Release signing status: `${{ needs.build-windows-installer.outputs.release-signing-status }}`.
 
-            Unsigned releases are updater-compatible but may show Windows SmartScreen or installer trust prompts. Do not treat unsigned builds as broadly trusted public distribution.
-
-            It contains the Windows NSIS installer, blockmap, and `latest.yml` metadata required by the installed Auralis app's Update now button.
+            It contains the signed Windows NSIS installer, blockmap, and `latest.yml` metadata required by the installed Auralis app's Update now button.
           files: |
             release/Auralis-Setup-*.exe
             release/Auralis-Setup-*.exe.blockmap

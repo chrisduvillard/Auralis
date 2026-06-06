@@ -30,14 +30,14 @@ Important expectations:
 - OpenRouter STT sends recorded audio to OpenRouter from Electron main when selected.
 - Browser Web Speech privacy behavior depends on the browser engine.
 - Desktop local Whisper setup may download Python packages and model artifacts before offline transcription is available.
-- Public Windows updater releases may be signed or unsigned; unsigned releases are for personal or explicitly trusted installs.
+- Public Windows updater releases are signed `v*` tag releases. Unsigned local builds are smoke artifacts only and are not published as updater-visible public releases.
 
 ## Release integrity
 
 GitHub Actions are pinned to full commit SHAs, with the upstream tag noted in comments.
 
-Updater-visible Windows releases can be published by the current workflow from successful, non-canceled pushes to `main` in the public `chrisduvillard/Auralis` repository, or from intentional `v*` tag pushes. The release body records whether the installer was signed or unsigned.
+Updater-visible Windows releases are published from intentional signed `v*` tag pushes only. The release body records the signed release status and the workflow verifies the installer Authenticode signature before GitHub Release publication.
 
-Public main-push releases and intentional `v*` tag releases are updater-visible even when unsigned so installed personal builds can update to the current public release. Unsigned updater-visible releases are for personal or explicitly trusted installs, not broad public distribution. Configure `WINDOWS_CERTIFICATE_P12` and `WINDOWS_CERTIFICATE_PASSWORD` before relying on the GitHub Releases feed for public trust-sensitive distribution.
+Public `main` pushes build, smoke, and upload unsigned installer artifacts for CI evidence, but they do not publish updater-visible GitHub Releases. If signing secrets are missing on a `v*` tag, the workflow fails before publication instead of publishing an unsigned public update.
 
 Enforce branch protection, protected or signed release tags, and repository rulesets before relying on the GitHub Releases feed for public updates.

@@ -153,9 +153,9 @@ release/Auralis-Setup-*.exe
 
 In the installed Windows app, **Update now** checks GitHub Releases for `chrisduvillard/Auralis`, then downloads and installs the latest updater-compatible Windows release when available.
 
-The Windows installer workflow publishes updater-visible releases from successful, non-canceled public `main` pushes in `chrisduvillard/Auralis`, and from intentional `v*` tag releases. It publishes the NSIS installer, `Auralis-Setup-*.exe.blockmap`, and GitHub Release metadata files such as `latest.yml`.
+The Windows installer workflow builds and smokes installer artifacts on `main`, but updater-visible public releases are published only from intentional signed `v*` tags. It publishes the signed NSIS installer, `Auralis-Setup-*.exe.blockmap`, and GitHub Release metadata files such as `latest.yml`.
 
-Unsigned updater-compatible releases are published when signing secrets are absent so the installed app's **Update now** button can still move to the current public release. Unsigned releases may show Windows SmartScreen or installer trust prompts and should be treated as personal or explicitly trusted installs, not broadly trusted public distribution. Local Windows installer builds remain unsigned unless signing is explicitly enabled.
+If Windows signing secrets are absent on a `v*` tag, the workflow fails before GitHub Release publication instead of publishing an unsigned public update. Local Windows installer builds remain unsigned unless signing is explicitly enabled.
 
 Private GitHub repositories are not a public update channel. Do not ship a GitHub token inside the app.
 
@@ -169,7 +169,19 @@ From a cloned checkout:
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/update-auralis.ps1
 ```
 
-The SHA512 check verifies the installer matches the GitHub Release metadata. It is an integrity guard for the public release feed, not a substitute for publisher signing. This fallback still uses the same public updater-compatible release assets. It does not make unsigned builds trusted; Windows may still show SmartScreen or installer trust prompts.
+The SHA512 check verifies the installer matches the GitHub Release metadata. It is an integrity guard for the public release feed, not a substitute for publisher signing. This fallback still uses the same public updater-compatible release assets.
+
+## Public release checklist
+
+Before cutting a public Windows release:
+
+- `package.json` version, release tag, installer filename, and `latest.yml` version all match
+- `WINDOWS_CERTIFICATE_P12` and `WINDOWS_CERTIFICATE_PASSWORD` are configured as GitHub Actions secrets
+- The Windows installer workflow reports a valid Authenticode signature before publishing
+- CI and `build-windows-installer` are green for the release commit
+- The GitHub Release is created from the intended signed `v*` tag and is not draft/prerelease unless explicitly intended
+- Downloaded release assets include the installer, `.blockmap`, and `latest.yml`, and `latest.yml` SHA512 matches the installer
+- A real Windows install/update smoke confirms launch, Update now, fallback updater, microphone, and target-app paste on an interactive desktop
 
 ## Validate locally
 
@@ -267,4 +279,4 @@ Remove those overrides only after upstream packages no longer resolve `boolean`,
 - Local Whisper first run can take time to download and warm up
 - Browser Web Speech support and privacy behavior vary by browser
 - OpenRouter STT is configured through `OPENROUTER_API_KEY`, not an in-app key field
-- Unsigned Windows releases may be updater-compatible but are not broadly trusted public distribution
+- Unsigned local Windows builds are smoke artifacts only; updater-visible public releases require signed `v*` tag builds
