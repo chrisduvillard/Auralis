@@ -14,6 +14,7 @@
   </p>
 
   <p>
+    <a href="#why-auralis">Why</a> ·
     <a href="#quick-start">Quick start</a> ·
     <a href="#daily-use">Daily use</a> ·
     <a href="#transcription-choices">Providers</a> ·
@@ -24,21 +25,36 @@
 
 ---
 
-Auralis is a minimalist Electron desktop app for turning speech into editable text. It works best as a desktop app. It can transcribe locally with Whisper, or optionally use OpenRouter when cloud transcription speed matters.
+Auralis is a quiet desktop dictation app for people who want text, not another workspace to manage. Keep your cursor where the work is, hold a shortcut, speak, and let the transcript land back where you were writing.
+
+It can transcribe locally with Whisper, or optionally use OpenRouter when cloud transcription speed matters. The default posture is local-first, transcript-first, and honest about what has actually been proven.
+
+> **Current public posture: open beta, unsigned Windows preview, signed stable releases only.**
+>
+> The repository is public and the app is usable from source. Windows preview builds are intentionally manual and unsigned until a signing certificate exists.
 
 ```text
-Cursor in target app -> hold Ctrl + Win -> speak -> release -> transcript copied or inserted
+Target app focused -> hold Ctrl + Win -> speak -> release -> Auralis copies or inserts the transcript
 ```
+
+## Why Auralis
+
+- **Keep your cursor where the work is.** Auralis is designed around the previous app, not a separate transcription inbox.
+- **No meeting bot, no dashboard, no transcription inbox to manage.** The core loop is capture, transcribe, edit, continue.
+- **Use local Whisper by default.** Fresh desktop profiles can run without a backend or API key after first-run setup.
+- **Choose cloud speed deliberately.** OpenRouter STT is available, but the provider boundary stays explicit and documented.
+- **Ship only what is proven.** Automated tests, installer smokes, unsigned preview caveats, and real-device gaps are separated on purpose.
 
 ## At a glance
 
-| Principle | What it means |
+| Surface | Current state |
 | --- | --- |
 | **Transcript-first desktop dictation** | The main surface is the text you just created, not a chatbot or recorder dashboard. |
 | **Local-first by default** | Fresh desktop profiles default to app-managed local Whisper with no required backend or API key. |
 | **Provider boundary** | OpenRouter STT is explicit and optional; Browser Web Speech remains a browser-dependent fallback. |
 | **Cursor-aware workflow** | Global-shortcut recordings can attempt paste into the previous app; button-started recordings copy only. |
-| **Signed stable releases** | Windows preview artifacts are unsigned; updater-visible public releases require signed `v*` tag builds. |
+| **Windows preview** | Unsigned manual artifacts are acceptable for beta testers, but they are not the stable updater channel. |
+| **Signed stable releases** | Updater-visible public releases require signed `v*` tag builds and matching release metadata. |
 
 ## Quick start
 

@@ -872,6 +872,12 @@ describe("desktop app packaging config", () => {
     expect(readme).toContain("src/assets/auralis-lynx-readme.png");
     expect(readme).toContain('alt="Auralis lynx avatar" width="88"');
     expect(readme).toContain("Transcript-first desktop dictation");
+    expect(readme).toContain("## Why Auralis");
+    expect(readme).toContain("Keep your cursor where the work is");
+    expect(readme).toContain("No meeting bot, no dashboard, no transcription inbox to manage.");
+    expect(readme).toContain(
+      "Current public posture: open beta, unsigned Windows preview, signed stable releases only.",
+    );
     expect(readme).toContain("## At a glance");
     expect(readme).toContain("## Proof, not promises");
     expect(readme).toContain("Local-first by default");
