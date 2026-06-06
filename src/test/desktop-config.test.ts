@@ -868,9 +868,9 @@ describe("desktop app packaging config", () => {
   it("anchors the polished README to the lynx avatar and proof-first product framing", () => {
     const readme = readProjectFile("README.md");
 
-    expect(existsSync(join(projectRoot, "src/assets/auralis-lynx-avatar.png"))).toBe(true);
-    expect(readme).toContain("src/assets/auralis-lynx-avatar.png");
-    expect(readme).toContain('alt="Auralis lynx avatar"');
+    expect(existsSync(join(projectRoot, "src/assets/auralis-lynx-readme.png"))).toBe(true);
+    expect(readme).toContain("src/assets/auralis-lynx-readme.png");
+    expect(readme).toContain('alt="Auralis lynx avatar" width="88"');
     expect(readme).toContain("Transcript-first desktop dictation");
     expect(readme).toContain("## At a glance");
     expect(readme).toContain("## Proof, not promises");
