@@ -14,6 +14,16 @@ function readProjectFile(path: string): string {
   return readFileSync(join(projectRoot, path), "utf-8");
 }
 
+function readPngSize(path: string): { height: number; width: number } {
+  const buffer = readFileSync(join(projectRoot, path));
+  expect([...buffer.subarray(0, 8)]).toEqual([137, 80, 78, 71, 13, 10, 26, 10]);
+  expect(buffer.toString("ascii", 12, 16)).toBe("IHDR");
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20),
+  };
+}
+
 describe("desktop app packaging config", () => {
   it("exposes first-class desktop npm commands", () => {
     const packageJson = JSON.parse(readProjectFile("package.json")) as {
@@ -865,12 +875,21 @@ describe("desktop app packaging config", () => {
     );
   });
 
-  it("anchors the polished README to the lynx avatar and proof-first product framing", () => {
+  it("anchors the polished README to the full supplied lynx artwork and proof-first product framing", () => {
     const readme = readProjectFile("README.md");
 
-    expect(existsSync(join(projectRoot, "src/assets/auralis-lynx-readme.png"))).toBe(true);
-    expect(readme).toContain("src/assets/auralis-lynx-readme.png");
-    expect(readme).toContain('alt="Auralis lynx avatar" width="88"');
+    expect(existsSync(join(projectRoot, "src/assets/auralis-lynx-hero.png"))).toBe(true);
+    expect(readPngSize("src/assets/auralis-lynx-hero.png")).toEqual({ width: 1086, height: 1448 });
+    expect(
+      createHash("sha256")
+        .update(readFileSync(join(projectRoot, "src/assets/auralis-lynx-hero.png")))
+        .digest("hex"),
+    ).toBe("3cfa3c3c3a8d5e5e00fd20fb8c37b62edc117ea2702061d661a84f4440ac1024");
+    expect(readme).toContain(
+      '<img src="src/assets/auralis-lynx-hero.png" alt="Auralis full lynx hero artwork" />',
+    );
+    expect(readme).not.toContain("src/assets/auralis-lynx-readme.png");
+    expect(readme).not.toContain('width="88"');
     expect(readme).toContain("Transcript-first desktop dictation");
     expect(readme).toContain("## Why Auralis");
     expect(readme).toContain("Keep your cursor where the work is");

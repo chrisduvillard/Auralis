@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="src/assets/auralis-lynx-readme.png" alt="Auralis lynx avatar" width="88" />
+  <img src="src/assets/auralis-lynx-hero.png" alt="Auralis full lynx hero artwork" />
 
   # Auralis
 
